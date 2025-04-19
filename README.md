@@ -21,6 +21,8 @@
 ✅ Added Language Support, now the output file is in the language of user's input.<br>
 ✅ Added single video url support, no need to put it in a playlist.<br>
 ✅ Added configurable Chunk Size for API calls.<br>
+✅ Added ability to specify start and end video indices in playlists for partial processing.<br>
+✅ Added support for outputting individual markdown files for each video, organized in a folder.<br>
 
 >> Users can now control the chunk size used when processing transcripts with the Gemini API via a slider in the UI. This allows for customization of processing behavior:
 >>- Larger chunk sizes: Reduce the number of API calls, potentially speeding up execution and suitable for summarizing longer videos with less emphasis on fine details.
@@ -47,7 +49,8 @@ Read more about it in this [Medium Article](https://medium.com/@ebrahimgolriz444
 *   Refine transcripts using Google Gemini API for improved formatting and readability.
 *   User-friendly PyQt5 graphical interface.
 *   Selectable Gemini models.
-*   Output to markdown file.
+*   Output to individual markdown file per video.
+*   Process specific segments of playlists by specifying start and end points.
 <br><br><br><br>
 
 
@@ -60,7 +63,8 @@ Read more about it in this [Medium Article](https://medium.com/@ebrahimgolriz444
 - 🧠 AI-powered text refinement using Gemini models
 - 📁 Configurable output file paths
 - ⏳ Progress tracking for both extraction and refinement
-- 📄 Output to formatted markdown file.
+- 📄 Output to formatted markdown files, one per video
+- 🔢 Selective playlist processing with start/end index options
 
 ## Requirements
 - Python 3.9+
@@ -90,12 +94,13 @@ pip install -r requirements.txt
     *   Type the Output Language.
     *   choose the style of output.
     *   Specify chunk size.
-    *   Choose output file locations for the transcript and Gemini refined text using the "Choose File" buttons.
+    *   Optionally set start and end video indices to process only a specific portion of a playlist.
+    *   Choose the transcript output file and a folder for Gemini refined markdown files.
     *   Enter your Gemini API key in the "Gemini API Key" field.
     *   Click "Start Processing".
     *   You can select a Gemini model.
     *   Wait for the processing to complete. Progress will be shown in the progress bar and status display.
-    *   The output files will be saved to the locations you specified.
+    *   The transcript will be saved to the specified file and individual markdown files (one per video) will be created in the output folder.
   
 ![Alt text for the image](Images/ED.png)
 _Example of Educational Style with added definition of technical terms_

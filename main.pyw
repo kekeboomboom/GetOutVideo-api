@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
-from pytube import Playlist
+from pytubefix import Playlist, YouTube
 from youtube_transcript_api import YouTubeTranscriptApi
 import google.generativeai as genai
 import re
@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
             and details while presenting the information in a format optimized for analysis by both humans and AI.
             REMEMBER that Details are important, DO NOT overlook Any details, even small ones.
             All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
+            Format the entire response using Markdown syntax.
             Text:
             """,
 
@@ -48,6 +49,7 @@ class MainWindow(QMainWindow):
             Aim for a summary that is shorter than the original transcript but still accurately reflects its key points.  
             Focus on conveying the most important information and conclusions.
 All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
+Format the entire response using Markdown syntax.
 Text: """,
             "Educational": """Transform the following transcript into a comprehensive educational text, resembling a textbook chapter. Structure the content with clear headings, subheadings, and bullet points to enhance readability and organization for educational purposes.
 
@@ -56,6 +58,7 @@ Crucially, identify any technical terms, jargon, or concepts that are mentioned 
 Ensure the text is highly informative, accurate, and retains all the original details and nuances of the transcript. The goal is to create a valuable educational resource that is easy to study and understand.
 
 All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
+Format the entire response using Markdown syntax, including the blockquotes for definitions.
 
 Text:""",
             "Narrative Rewriting": """Rewrite the following transcript into an engaging narrative or story format. Transform the factual or conversational content into a more captivating and readable piece, similar to a short story or narrative article.
@@ -63,6 +66,7 @@ Text:""",
 While rewriting, maintain a close adherence to the original subjects and information presented in the video. Do not deviate significantly from the core topics or introduce unrelated elements.  The goal is to enhance engagement and readability through storytelling techniques without altering the fundamental content or message of the video.  Use narrative elements like descriptive language, scene-setting (if appropriate), and a compelling flow to make the information more accessible and enjoyable.
 
 All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
+Format the entire response using Markdown syntax for appropriate emphasis or structure (like paragraph breaks).
 
 Text:""",
             "Q&A Generation": """Generate a set of questions and answers based on the following transcript for self-assessment or review.  For each question, create a corresponding answer.
@@ -72,6 +76,7 @@ Format each question as a level 3 heading using Markdown syntax (### Question Te
 Ensure the questions are relevant to the key information and concepts in the transcript and that the answers are accurate and comprehensive based on the video content.
 
 All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
+Format the entire response using Markdown syntax as specified.
 
 Text:"""
         }
@@ -323,10 +328,10 @@ Text:"""
 
 
         # File Inputs
-        self.create_file_input(input_layout, "   Transcript Output:", "Choose File",
+        self.create_file_input(input_layout, "   Transcript Output File:", "Choose File",
                              "transcript_file_input", self.select_transcript_output_file)
-        self.create_file_input(input_layout, "   Gemini Output:", "Choose File",
-                             "gemini_file_input", self.select_gemini_output_file)
+        self.create_directory_input(input_layout, "   Gemini Output Folder:", "Choose Folder",
+                             "gemini_output_dir_input", self.select_gemini_output_directory)
 
         # API Key Input
         api_key_layout = QVBoxLayout()
@@ -441,6 +446,33 @@ Text:"""
 
         setattr(self, field_name, input_field)
 
+    def create_directory_input(self, parent_layout, label_text, button_text, field_name, handler):
+        layout = QHBoxLayout()
+
+        input_field = QLineEdit()
+        input_field.setObjectName(field_name)
+        input_field.setReadOnly(True)
+        input_field.setPlaceholderText(f"Select {label_text.split(':')[0].strip()} folder")
+        input_field.setStyleSheet(self.get_input_style())
+
+        button = QPushButton(button_text)
+        button.setStyleSheet(self.get_button_style("#3498db", "#2980b9"))
+        button.clicked.connect(handler)
+
+        layout.addWidget(input_field)
+        layout.addWidget(button)
+
+        font = QFont("Segoe UI", 10, QFont.Bold)
+        label = QLabel(label_text)
+        font = QFont("Segoe UI", 10, QFont.Bold)  # Family, size, weight
+        label.setFont(font)
+        label.setStyleSheet("padding: 0px;")
+
+        parent_layout.addWidget(label)
+        parent_layout.addLayout(layout)
+
+        setattr(self, field_name, input_field)
+
     def get_input_style(self):
         return """
             QLineEdit {
@@ -517,14 +549,24 @@ Text:"""
             msg_box.exec_()
             return False
 
-        if not self.gemini_file_input.text().endswith(".txt"):
+        # Validate Gemini output directory (MODIFIED)
+        gemini_dir = self.gemini_output_dir_input.text().strip()
+        if not gemini_dir:
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;") # Style QMessageBox
+            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
             msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setText("Gemini output file must be a .txt file")
-            msg_box.setWindowTitle("Invalid File")
+            msg_box.setText("Please select a folder for the Gemini output.")
+            msg_box.setWindowTitle("Output Folder Required")
             msg_box.exec_()
             return False
+        if not os.path.isdir(gemini_dir): # Check if it's a valid directory
+             msg_box = QMessageBox()
+             msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+             msg_box.setIcon(QMessageBox.Warning)
+             msg_box.setText("The selected Gemini output path is not a valid folder.")
+             msg_box.setWindowTitle("Invalid Folder")
+             msg_box.exec_()
+             return False
 
         if not self.api_key_input.text().strip():
             msg_box = QMessageBox()
@@ -572,10 +614,26 @@ Text:"""
         self.extract_button.setEnabled(not processing)
         self.cancel_button.setEnabled(processing)
 
+        # Add the new directory input and remove the old file input (MODIFIED)
         inputs = [self.url_input, self.transcript_file_input,
-                self.gemini_file_input, self.api_key_input, self.language_input]
+                self.gemini_output_dir_input, self.api_key_input, self.language_input,
+                self.start_index_input, self.end_index_input, # Add start/end inputs if they exist
+                self.category_combo, self.chunk_size_slider] # Disable category/chunk during processing
         for input_field in inputs:
-            input_field.setReadOnly(processing)
+            # Check if it's a QLineEdit or QComboBox/QSlider before setting readOnly/enabled
+             if isinstance(input_field, (QLineEdit, QTextEdit)):
+                 input_field.setReadOnly(processing)
+             elif isinstance(input_field, (QComboBox, QSlider, QPushButton)): # Assuming buttons might be added here too
+                 input_field.setEnabled(not processing)
+             # Add elif for other widget types if necessary
+
+
+        # Also disable the select buttons associated with file/dir inputs
+        # You might need to store references to the buttons if not done already
+        # Example assuming you stored buttons like self.transcript_button, self.gemini_dir_button
+        # self.transcript_button.setEnabled(not processing)
+        # self.gemini_dir_button.setEnabled(not processing)
+        # If you didn't store references, you can iterate through children of the layout containing the button.
 
     def select_gemini_model(self):
         msg_box = QMessageBox()
@@ -645,10 +703,10 @@ Text:"""
         selected_prompt = self.prompts[self.selected_category]
         self.gemini_thread = GeminiProcessingThread(
             transcript_file,
-            self.gemini_file_input.text(),
+            self.gemini_output_dir_input.text(),
             self.api_key_input.text(),
-            self.selected_model_name, # Pass selected model name
-            output_language, # Pass output language
+            self.selected_model_name,
+            output_language,
             chunk_size=current_chunk_size,
             prompt=selected_prompt
         )
@@ -671,12 +729,12 @@ Text:"""
         color = "#3498db" if "extraction" in message else "#2ecc71"
         self.status_display.append(f"<font color='{color}'>{message}</font>")
 
-    def handle_success(self, output_file):
+    def handle_success(self, output_path):
         self.set_processing_state(False)
         msg_box = QMessageBox()
-        msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;") # Style QMessageBox
+        msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
         msg_box.setIcon(QMessageBox.Information)
-        msg_box.setText(f"Processing complete!\nOutput saved to: {output_file}")
+        msg_box.setText(f"Processing complete!\nOutput files saved in folder:\n{output_path}")
         msg_box.setWindowTitle("Success")
         msg_box.exec_()
         self.progress_bar.setValue(100)
@@ -709,16 +767,23 @@ Text:"""
     def select_transcript_output_file(self):
         self.select_output_file("Select Transcript Output File", self.transcript_file_input)
 
-    def select_gemini_output_file(self):
-        self.select_output_file("Select Gemini Output File", self.gemini_file_input)
+    def select_gemini_output_directory(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.ShowDirsOnly # Ensure only directories can be selected
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "Select Gemini Output Folder", "", options=options)
+        if dir_path:
+            # Use the attribute name set in create_directory_input
+            self.gemini_output_dir_input.setText(dir_path)
 
     def select_output_file(self, title, field):
+        # This function is now only used for the transcript file
         options = QFileDialog.Options()
         file_path, _ = QFileDialog.getSaveFileName(
             self, title, "", "Text Files (*.txt);;All Files (*)", options=options)
         if file_path:
             if not (file_path.endswith(".txt") ):
-                file_path += ".txt"  # Default to .txt if no extension is given
+                file_path += ".txt"
             field.setText(file_path)
 
 
@@ -774,7 +839,6 @@ class TranscriptExtractionThread(QThread):
                 original_total_videos = 1
                 # Try to get video title for single video case (optional, less likely to fail here)
                 try:
-                    from pytube import YouTube
                     yt = YouTube(url)
                     playlist_name = yt.title
                     self.status_update.emit(f"Processing single video: {playlist_name}")
@@ -828,23 +892,34 @@ class TranscriptExtractionThread(QThread):
                     if not self._is_running:
                         return
 
+                    original_index = slice_start + index # Calculate original index
+
                     try:
+                        # --- Get Video Title (NEW) ---
+                        video_title = f"Video_{original_index}" # Default title
+                        try:
+                            yt = YouTube(video_url)
+                            video_title = yt.title
+                        except Exception as title_e:
+                            self.status_update.emit(f"Warning: Could not get title for video {original_index} ({video_url}): {str(title_e)}")
+                        # --- End Get Video Title ---
+
+
                         video_id = video_url.split("?v=")[1].split("&")[0]
                         transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
                         transcript = ' '.join([transcript['text'] for transcript in transcript_list])
 
+                        # --- Write Title and URL to transcript file (MODIFIED) ---
+                        f.write(f"Video Title: {video_title}\n") # Add title line
                         f.write(f"Video URL: {video_url}\n")
                         f.write(transcript + '\n\n')
+                        # --- End Write Title/URL ---
 
-                        # Progress is now based on the sliced list size
+
                         progress_percent = int((index / total_videos) * 100)
                         self.progress_update.emit(progress_percent)
-                        # Use the actual video number from the original list for status if desired,
-                        # but using 'index' relative to the slice is simpler and clearer for progress.
-                        original_index = slice_start + index # Calculate original index if needed for logs/status
-                        self.status_update.emit(f"Extracted transcript for video {index}/{total_videos} (Original Playlist Index: {original_index})")
+                        self.status_update.emit(f"Extracted transcript for video {index}/{total_videos} (Original Playlist Index: {original_index}) - Title: {video_title[:30]}...")
                     except Exception as video_error:
-                        original_index = slice_start + index
                         self.status_update.emit(f"Error processing video {index}/{total_videos} (Original Playlist Index: {original_index}, URL: {video_url}): {str(video_error)}")
 
 
@@ -867,10 +942,10 @@ class GeminiProcessingThread(QThread):
     chunk_size = MainWindow.DEFAULT_CHUNK_SIZE # Referencing the constant
 
 
-    def __init__(self, input_file, output_file, api_key, selected_model_name, output_language, chunk_size,prompt): 
+    def __init__(self, input_file, output_dir, api_key, selected_model_name, output_language, chunk_size, prompt): 
         super().__init__()
         self.input_file = input_file
-        self.output_file = output_file
+        self.output_dir = output_dir
         self.api_key = api_key
         # Use the chunk_size passed from MainWindow, which originates from the slider
         # The initial/default value of the slider is now set by MainWindow.DEFAULT_CHUNK_SIZE
@@ -885,73 +960,113 @@ class GeminiProcessingThread(QThread):
     def run(self):
         try:
             genai.configure(api_key=self.api_key)
-            video_chunks = self.split_videos(self.input_file) # input_file is transcript file path
-            final_output_path = self.output_file
-            response_file_path = self.output_file.replace(".txt", "_temp_response.txt")
-            total_videos = len(video_chunks) -1 if len(video_chunks) > 1 else 0 # Calculate total videos for progress
+            # Split based on 'Video Title:' now
+            video_data_chunks = self.split_videos_by_title(self.input_file)
+            total_videos = len(video_data_chunks)
 
-            with open(response_file_path, "w", encoding="utf-8") as response_file:
-                response_file.write("")
+            if total_videos == 0:
+                self.status_update.emit("No video data found in the transcript file to process.")
+                self.processing_complete.emit(self.output_dir) # Still complete, just did nothing
+                return
 
-            for video_index, video_chunk in enumerate(video_chunks[1:]): # Start from 1 to skip empty chunk
-                if not self._is_running: # Check for stop signal
+
+            for video_index, video_data in enumerate(video_data_chunks):
+                if not self._is_running:
                     return
-                self.status_update.emit(f"\nProcessing Video {video_index + 1}/{total_videos}: Preview: {video_chunk[:50]}...")
-                word_count = len(video_chunk.split())
+
+                # --- Extract Title and Transcript (NEW) ---
+                lines = video_data.strip().split('\n', 2) # Split into max 3 parts: Title line, URL line, rest (transcript)
+                video_title = "Unknown Video"
+                video_url = "Unknown URL"
+                video_transcript = ""
+
+                if len(lines) >= 1 and lines[0].startswith("Video Title:"):
+                    video_title = lines[0].replace("Video Title:", "").strip()
+                if len(lines) >= 2 and lines[1].startswith("Video URL:"):
+                    video_url = lines[1].replace("Video URL:", "").strip() # Keep URL for reference if needed
+                if len(lines) >= 3:
+                    video_transcript = lines[2].strip()
+
+                if not video_transcript:
+                    self.status_update.emit(f"Skipping Video {video_index + 1}/{total_videos} (Title: {video_title[:30]}...) - No transcript found.")
+                    continue # Skip if no transcript content
+
+                sanitized_title = sanitize_filename(video_title)
+                # Construct individual markdown file path (NEW)
+                final_output_path = os.path.join(self.output_dir, f"{sanitized_title}.md")
+                # --- End Extract Title/Transcript ---
+
+
+                self.status_update.emit(f"\nProcessing Video {video_index + 1}/{total_videos}: {video_title[:50]}...")
+                word_count = len(video_transcript.split()) # Use extracted transcript
                 self.status_update.emit(f"Word Count: {word_count} words")
                 self.status_update.emit(f"Chunk Size: {self.chunk_size} words")
-                
 
-                video_transcript_chunks = self.split_text_into_chunks(video_chunk, self.chunk_size)
+
+                video_transcript_chunks = self.split_text_into_chunks(video_transcript, self.chunk_size)
                 previous_response = ""
+                full_video_response = "" # Accumulate response for the current video
+
                 for chunk_index, chunk in enumerate(video_transcript_chunks):
-                    if not self._is_running: # Check for stop signal inside inner loop
+                    if not self._is_running:
                         return
                     if previous_response:
-                        context_prompt = (
-                            "The following text is a continuation... "
-                            f"Previous response:\n{previous_response}\n\nNew text to process(Do Not Repeat the Previous response:):\n"
-                        )
+                        # Consider if context from previous chunk is helpful for markdown generation
+                        # For now, let's keep it simple and process each chunk independently for the final file
+                        context_prompt = "" # Simplified for markdown - might re-evaluate if needed
+                        # context_prompt = (
+                        #     "Continue refining the text based on the previous section..."
+                        #     f"Previous section's refined text (for context only, do not repeat):\n{previous_response}\n\nNew text to process:\n"
+                        # )
                     else:
                         context_prompt = ""
 
-                    # Replace [Language] with user specified language
+
                     formatted_prompt = self.prompt.replace("[Language]", self.output_language)
+                    # Ensure the prompt asks for Markdown if that's the desired format implicit in .md extension
+                    # Add "Format the output using Markdown." to prompts if not already there.
+                    # Example: Add "Use Markdown for headings, lists, and emphasis." to the end of each prompt definition in __init__
                     full_prompt = f"{context_prompt}{formatted_prompt}\n\n{chunk}"
 
-                    model = genai.GenerativeModel(self.selected_model_name) # Use selected model
+                    model = genai.GenerativeModel(self.selected_model_name)
 
-                    self.status_update.emit(f"Generating Gemini response for Video {video_index + 1}/{total_videos}, Chunk {chunk_index + 1}/{len(video_transcript_chunks)}, please wait...")
+                    self.status_update.emit(f"Generating Gemini response for Video {video_index + 1}, Chunk {chunk_index + 1}/{len(video_transcript_chunks)}...")
                     response = model.generate_content(full_prompt)
 
-                    with open(response_file_path, "a", encoding="utf-8") as response_file:
-                        response_file.write(response.text + "\n\n")
-                    previous_response = response.text
-                    self.status_update.emit(f"Chunk {chunk_index + 1}/{len(video_transcript_chunks)} processed and saved to temp file.")
+                    # Append response to the accumulator for this video (MODIFIED)
+                    full_video_response += response.text + "\n\n"
+                    previous_response = response.text # Still needed if context_prompt is re-enabled
+                    self.status_update.emit(f"Chunk {chunk_index + 1}/{len(video_transcript_chunks)} processed.")
 
-                self.status_update.emit(f"All Gemini responses for video {video_index + 1} have been saved to temp file.")
+                # Write the accumulated response for the video to its MD file (MODIFIED)
+                try:
+                     with open(final_output_path, "w", encoding="utf-8") as final_output_file:
+                         # Add Title as H1 and URL at the top (NEW)
+                         final_output_file.write(f"# {video_title}\n\n")
+                         final_output_file.write(f"**Original Video URL:** {video_url}\n\n")
+                         # Write the Gemini-processed content after title and URL
+                         final_output_file.write(full_video_response.strip()) # Write combined response
+                     self.status_update.emit(f"Saved Gemini output for video {video_index + 1} to {final_output_path}")
+                except IOError as e:
+                     self.status_update.emit(f"Error writing file {final_output_path}: {e}")
+                     self.error_occurred.emit(f"Error writing file {final_output_path}: {e}")
+                     # Decide whether to stop or continue with next video
+                     continue # Continue for now
 
-                with open(response_file_path, "r", encoding="utf-8") as response_file:
-                    video_response_content = response_file.read()
 
-                with open(final_output_path, "a", encoding="utf-8") as final_output_file:
-                    final_output_file.write(f"Video URL: {video_chunks[video_index+1].splitlines()[0].replace('Video URL: ', '')}\n") # Add Video URL as heading
-                    final_output_file.write(video_response_content + "\n\n")
+                progress_percent = int(((video_index + 1) / total_videos) * 100) if total_videos > 0 else 100
+                self.progress_update.emit(progress_percent)
 
-                with open(response_file_path, "w", encoding="utf-8") as response_file:
-                    response_file.write("") # Clear temp file
 
-                progress_percent = int(((video_index + 1) / total_videos) * 100) if total_videos > 0 else 100 # Calculate Gemini progress
-                self.progress_update.emit(progress_percent) # Emit Gemini progress
-                self.status_update.emit(f"Final Gemini output for video {video_index + 1} appended to {final_output_path}")
-
-            self.status_update.emit(f"All Gemini responses for all videos have been saved to {final_output_path}.")
-            self.processing_complete.emit(final_output_path)
-            self.progress_update.emit(100) # Ensure progress bar reaches 100% at the end
+            self.status_update.emit(f"All Gemini responses saved to individual files in {self.output_dir}.")
+            # Emit the directory path on completion (MODIFIED)
+            self.processing_complete.emit(self.output_dir)
+            self.progress_update.emit(100)
         except Exception as e:
-            error_message = f"Gemini error: {str(e)}"
+            error_message = f"Gemini processing error: {str(e)}"
+            # Include more details if possible, e.g., which video was being processed
             self.error_occurred.emit(error_message)
-            logging.error(error_message)
+            logging.exception("Gemini processing error") # Log full traceback
 
 
     def split_text_into_chunks(self, text, chunk_size, min_chunk_size=500):
@@ -962,15 +1077,56 @@ class GeminiProcessingThread(QThread):
             chunks.pop()
         return chunks
 
-    def split_videos(self, file_path):
-        with open(file_path, "r", encoding="utf-8") as file:
-            content = file.read()
-        video_chunks = re.split(r'(?=Video URL:)', content) # Split by Video URL: from transcript file
-        video_chunks = [chunk.strip() for chunk in video_chunks if chunk.strip()]
-        return video_chunks
+    def split_videos_by_title(self, file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as file:
+                content = file.read()
+            # Split based on the "Video Title:" line, keeping the delimiter
+            video_chunks = re.split(r'(?=Video Title:)', content)
+            # Remove the first element if it's empty (often happens if file starts with delimiter)
+            if video_chunks and not video_chunks[0].strip():
+                video_chunks = video_chunks[1:]
+            # Strip whitespace from each chunk
+            video_chunks = [chunk.strip() for chunk in video_chunks if chunk.strip()]
+            return video_chunks
+        except FileNotFoundError:
+            self.error_occurred.emit(f"Transcript file not found: {file_path}")
+            return []
+        except Exception as e:
+             self.error_occurred.emit(f"Error reading or splitting transcript file {file_path}: {e}")
+             return []
+
 
     def stop(self):
         self._is_running = False
+
+
+# --- Helper function for sanitizing filenames (NEW) ---
+def sanitize_filename(filename):
+    """Removes or replaces characters invalid in Windows/Linux/Mac filenames."""
+    # Remove characters invalid in Windows filenames: < > : " / \ | ? *
+    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+    # Replace characters potentially problematic or invalid in some contexts (optional)
+    sanitized = sanitized.replace('&', 'and')
+    # Remove leading/trailing whitespace
+    sanitized = sanitized.strip()
+    # Replace sequences of whitespace with a single underscore
+    sanitized = re.sub(r'\s+', '_', sanitized)
+    # Limit length (optional, e.g., 200 chars)
+    max_len = 200
+    if len(sanitized) > max_len:
+        # Find the last underscore before max_len to avoid cutting words
+        cut_point = sanitized[:max_len].rfind('_')
+        if cut_point != -1:
+            sanitized = sanitized[:cut_point]
+        else:
+            sanitized = sanitized[:max_len]
+
+    # Ensure filename is not empty after sanitization
+    if not sanitized:
+        return "untitled_video"
+    return sanitized
+# --- End Helper function ---
 
 
 if __name__ == "__main__":
