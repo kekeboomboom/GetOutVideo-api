@@ -88,8 +88,8 @@ Text:"""
         self.extraction_thread = None
         self.gemini_thread = None
         self.is_processing = False
-        self.available_models = ["gemini-2.5-pro-exp-03-25"] # Static model list
-        self.selected_model_name = "gemini-2.5-pro-exp-03-25" # Default model
+        self.available_models = ["gemini-2.5-flash-preview-04-17", "gemini-2.5-pro-preview-03-25", "gpt-4.1-mini"] # Static model list
+        self.selected_model_name = "gemini-2.5-flash-preview-04-17" # Default model
 
         # Set the class variable default chunk size using the constant
         GeminiProcessingThread.chunk_size = self.DEFAULT_CHUNK_SIZE
