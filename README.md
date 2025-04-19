@@ -1,61 +1,80 @@
 # YouTube Playlist Processor
-<br>
-<br>
 
-![Alt text for the image](Images/image.jpg)<br><br>
-
-✅ Added several Refinement styles to choose from based on your specific needs.
-> The "Refinement Style" dropdown allows you to choose how AI will process the YouTube transcript. Here's a description of each style:
-    
->> ⚖️ **Balanced and Detailed**: This is the default style, providing a comprehensive refinement of the transcript. It focuses on organizing the text into a well-structured, readable format with headings, bullet points, and bold text, while preserving every detail, context, and nuance of the original content. Ideal if you want a thoroughly enhanced transcript without any information loss.
-    
->> 📝 **Summary**:  This style generates a concise and informative summary of the video transcript. It extracts the core message, main arguments, and key information, providing a quick and easily digestible overview of the video's content. Best for when you need to quickly grasp the main points without reading the entire transcript.
-    
->> 📚 **Educational**: This style transforms the transcript into a structured educational text, similar to a textbook chapter. It uses headings, subheadings, and bullet points for clarity and organization, making it ideal for learning.  **Crucially, it also identifies and defines technical terms and jargon within blockquotes, enhancing understanding and acting as a built-in glossary. (Example Image Below)**
-    
->> ✍️ **Narrative Rewriting**:  This style creatively rewrites the transcript into an engaging narrative or story format. It transforms the factual or conversational content into a more captivating and readable piece, like a short story or narrative article.  While storytelling is applied, it stays closely aligned with the original video's subjects and information, making the content more accessible and enjoyable.
-    
->> ❓ **Q&A Generation**:  This style generates a set of questions and answers based on the transcript, formatted for self-assessment or review. Each question is presented as a foldable header (using Markdown), with the answer hidden beneath.  This format is perfect for creating study guides or quizzes to test your understanding of the video content.(Example Image Below)<br><br>
-
-
-✅ Added Language Support, now the output file is in the language of user's input.<br>
-✅ Added single video url support, no need to put it in a playlist.<br>
-✅ Added configurable Chunk Size for API calls.<br>
-✅ Added ability to specify start and end video indices in playlists for partial processing.<br>
-✅ Added support for outputting individual markdown files for each video, organized in a folder.<br>
-
->> Users can now control the chunk size used when processing transcripts with the Gemini API via a slider in the UI. This allows for customization of processing behavior:
->>- Larger chunk sizes: Reduce the number of API calls, potentially speeding up execution and suitable for summarizing longer videos with less emphasis on fine details.
->>- Smaller chunk sizes: Increase API calls but may preserve more detail and nuance, potentially beneficial for tasks requiring high fidelity output.<br><br>
->> ❓ What is **Chunk Size**?<br>
->>  A video, is divided into chunks to be given to AI, so if you set chunk size to 3000 words, and the video has 8000 words, the API workflow would be like this :
->>  > - First 3000 words ➡➡processed by AI➡➡ Refined part 1
->>  > - Second 3000 words +  Refined part 1 as context ➡➡processed by AI➡➡ Refinde part 2
->>  > - final 2000 words +  Refined part 1  + 2 as context ➡➡processed by AI➡➡ Refinde part 3
->>  > - Refined part 1 + Refined part 2 + Refined part 3 = Final Formatted Text of the video!
-
-<br>
-<br>
-This Python application extracts transcripts from YouTube playlists and refines them using the Google Gemini API(which is free). It takes a YouTube playlist URL as input, extracts transcripts for each video, and then uses Gemini to reformat and improve the readability of the combined transcript. The output is saved as a text file.
 <br><br>
-So you can have a neatly formatted book out of a YouTube playlist!<br>
-I personally use it to convert large YouTube playlists containing dozens of long videos into a very large organized markdown file to give it as input to NotebookLM as one source.<br>
-Works Great with Obsidian too!<br><br>
-
-Read more about it in this [Medium Article](https://medium.com/@ebrahimgolriz444/a-tool-to-turn-entire-youtube-playlists-to-markdown-formatted-and-refined-text-books-in-any-3e8742f5d0d3)
+![Alt text for the image](Images/image.jpg)
 <br><br>
 
-*   Batch processing of entire playlists
-*   Refine transcripts using Google Gemini API for improved formatting and readability.
-*   User-friendly PyQt5 graphical interface.
-*   Selectable Gemini models.
-*   Output to individual markdown file per video.
-*   Process specific segments of playlists by specifying start and end points.
-<br><br><br><br>
+✅ **Multiple Refinement Styles — Checkboxes**  
+> You can now select **one or more** refinement styles at the same time. The application will generate **separate output files** for each selected style, each appended with `[StyleName]` in its filename.  
+> For example, if you check “Balanced and Detailed” and “Educational”, you will end up with two `.md` files per video:
+> ```
+> AI_News_OpenAI_Just_Dropped_An_Amazing_New_Model! [Balanced and Detailed].md
+> AI_News_OpenAI_Just_Dropped_An_Amazing_New_Model! [Educational].md
+> ```
 
+Here’s a quick rundown of the available styles:
+
+>> ⚖️ **Balanced and Detailed**  
+>> - Provides a comprehensive refinement of the transcript.  
+>> - Organizes text into a well-structured, readable format with headings, bullet points, and bold text.  
+>> - Preserves **every detail, context, and nuance** of the original content.  
+>> - Ideal when you want a thoroughly enhanced transcript without any information loss.
+
+>> 📝 **Summary**  
+>> - Generates a **concise and informative** summary.  
+>> - Identifies the core message, main arguments, and key pieces of information.  
+>> - Great for quickly grasping **the main points** without reading the entire transcript.
+
+>> 📚 **Educational**  
+>> - Transforms the transcript into a **structured educational text**, like a textbook chapter.  
+>> - Organizes content with headings, subheadings, and bullet points for clarity.  
+>> - **Identifies and defines technical terms** in blockquotes near their first mention.  
+>> - Perfect for learning or study materials (see example image below).
+
+>> ✍️ **Narrative Rewriting**  
+>> - **Rewrites** the transcript into an **engaging narrative** or story format.  
+>> - Stays faithful to the original topics but uses storytelling techniques to enhance readability and enjoyment.
+
+>> ❓ **Q&A Generation**  
+>> - Generates a set of **questions and answers** based on the transcript.  
+>> - Each question is presented as a **foldable header** in Markdown (`### Question Text`), with the answer hidden below.  
+>> - Excellent for self-assessment, quizzes, or study guides (see example image below).
+
+<br>
+
+✅ **Language Support**: Choose the language of your output.  
+✅ **Single Video URL**: You can provide a single video link instead of a playlist.  
+✅ **Configurable Chunk Size**: Control the number of words per API call to Gemini.  
+✅ **Specify Start and End Video Indices** for partial playlist processing.  
+✅ **One Markdown File Per Video** in an output folder, each refined according to your selected style(s).  
+
+<br>
+
+>> **Chunk Size**  
+>> - A video is divided into chunks for processing by the AI.  
+>> - For example, if you set a chunk size of 3000 words and a video has 8000 words, it’s processed in three chunks (3000, 3000, 2000).  
+>> - **Larger chunk sizes** can reduce API calls and speed up processing but risk losing detail or hitting token limits.  
+>> - **Smaller chunk sizes** increase API calls but can preserve more nuance.  
+
+<br>
+
+This Python application extracts transcripts from YouTube playlists (or single videos) and **refines** them using the **Google Gemini API** (which is free).  
+It takes a YouTube URL as input, extracts transcripts for each video, and then uses Gemini to **reformat and improve readability**.  
+
+**The result** is multiple Markdown files (one per video **and** per selected style) — so you can create a neatly formatted “book” out of a YouTube playlist!  
+
+- Works nicely as an input source for NotebookLM or as a set of documents in Obsidian.  
+- Check out this [Medium Article](https://medium.com/@ebrahimgolriz444/a-tool-to-turn-entire-youtube-playlists-to-markdown-formatted-and-refined-text-books-in-any-3e8742f5d0d3) for more details.
+
+<br>
+
+*   Batch processing of entire playlists  
+*   User-friendly PyQt5 graphical interface  
+*   Selectable Gemini models  
+*   Process specific segments of playlists by specifying start/end points  
+<br><br>
 
 ![Alt text for the image](Images/image2.png)<br><br>
-
 
 
 ## Features
@@ -63,50 +82,60 @@ Read more about it in this [Medium Article](https://medium.com/@ebrahimgolriz444
 - 🧠 AI-powered text refinement using Gemini models
 - 📁 Configurable output file paths
 - ⏳ Progress tracking for both extraction and refinement
-- 📄 Output to formatted markdown files, one per video
+- 📄 Output to formatted markdown files, one per video **per selected style**
 - 🔢 Selective playlist processing with start/end index options
 
 ## Requirements
 - Python 3.9+
 - Google Gemini API key
-- YouTube playlist URL
+- YouTube playlist or single video URL
 
 ## Installation
 ```bash
 pip install -r requirements.txt
 ```
-## How does it work?
-* First, the transcript of every video in the playlist is fetched.
-* since gemini api doesnt have unlimited context window for input and output, the text for each video gets divided into chunks(right now, chunk size is set to 3000 after testing, but it can be changed via the added slider)
-* Each text chunk is then sent to the Gemini API, along with a context prompt that includes the previously refined text. This helps maintain consistency and coherence across chunks.
-* The refined output from Gemini for each chunk is appended to the final output file.
-* This process is repeated for every video in the playlist, resulting in a single, refined transcript output file for the entire playlist.
-    
-## Usage
 
-1.  **Get a Gemini API Key:** You need a Google Gemini API key. Obtain one from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key).
-2.  **Run the Application:**
+## How does it work?
+1. **Transcript Extraction**: Fetches the transcript of every video in the playlist (or the single video provided).  
+2. **Chunking**: Because Gemini has limited context windows, each video’s text is divided into chunks (default 3000 words, adjustable via slider).  
+3. **Refinement by Gemini**:  
+   - Each chunk is sent to the Gemini API with a style-specific prompt (e.g., “Educational”).  
+   - The refined text is appended to the final output.  
+4. **Multiple Styles**: If you select multiple styles, the script repeats the refinement step for each style, writing each style’s result into a separate `.md` file.  
+5. **Final Output**: You get a folder full of Markdown files — one per video **for each** refinement style you chose.
+
+## Usage
+1. **Obtain a Gemini API Key**: from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key).
+2. **Run the Application**:
     ```bash
     python main.py
     ```
-3.  **In the GUI:**
-    *   Enter the YouTube Playlist URL or Video link.
-    *   Type the Output Language.
-    *   choose the style of output.
-    *   Specify chunk size.
-    *   Optionally set start and end video indices to process only a specific portion of a playlist.
-    *   Choose the transcript output file and a folder for Gemini refined markdown files.
-    *   Enter your Gemini API key in the "Gemini API Key" field.
-    *   Click "Start Processing".
-    *   You can select a Gemini model.
-    *   Wait for the processing to complete. Progress will be shown in the progress bar and status display.
-    *   The transcript will be saved to the specified file and individual markdown files (one per video) will be created in the output folder.
-  
+3. **In the GUI**:
+   - Enter the YouTube **Playlist URL** or **single Video link**.
+   - Select your desired **Refinement Styles** (one or more).
+   - Type your **Output Language**.
+   - Adjust the **Chunk Size** slider if needed.
+   - (Optional) Set **Start** and **End** video indices for partial playlist processing.
+   - Choose an **output folder** for the refined `.md` files.
+   - (Optional) set a custom transcript output file if desired.
+   - Enter your **Gemini API key**.
+   - Click **Start Processing** and watch progress in the status area.
+
+<br>
+
 ![Alt text for the image](Images/ED.png)
-_Example of Educational Style with added definition of technical terms_
-<br><br>
-![Alt text for the image](Images/QA.png)
-_Example of Q&A Style, Questions are headers so they can be folded/unfolded_
+_Example of Educational Style with definitions in blockquotes_
+
 <br><br>
 
-> YouTube playlist used for example files : https://www.youtube.com/playlist?list=PLmHVyfmcRKyx1KSoobwukzf1Nf-Y97Rw0
+![Alt text for the image](Images/QA.png)
+_Example of Q&A Style, with foldable Q&A sections_
+
+<br><br>
+
+> **Example YouTube playlist** used for screenshots:  
+> https://www.youtube.com/playlist?list=PLmHVyfmcRKyx1KSoobwukzf1Nf-Y97Rw0  
+
+---  
+
+Enjoy quickly turning your YouTube playlists into refined Markdown “books” with definitions, summaries, Q&As, and more!
