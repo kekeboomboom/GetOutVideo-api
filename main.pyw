@@ -219,6 +219,41 @@ Text:"""
         language_layout.addWidget(self.language_input)
         input_layout.addLayout(language_layout)
 
+        # Start/End Video Index Input (NEW)
+        index_layout = QHBoxLayout() # Use QHBoxLayout for side-by-side inputs
+
+        start_index_layout = QVBoxLayout()
+        start_label = QLabel("Start Video Index:")
+        start_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        start_label.setStyleSheet("color: #ecf0f1;")
+        self.start_index_input = QLineEdit()
+        self.start_index_input.setPlaceholderText("1") # Default to 1
+        self.start_index_input.setText("1")
+        self.start_index_input.setFont(QFont("Segoe UI", 9))
+        self.start_index_input.setStyleSheet(self.get_input_style())
+        self.start_index_input.setFixedWidth(80) # Make it smaller
+        start_index_layout.addWidget(start_label)
+        start_index_layout.addWidget(self.start_index_input)
+
+        end_index_layout = QVBoxLayout()
+        end_label = QLabel("End Video Index (0 for all):")
+        end_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        end_label.setStyleSheet("color: #ecf0f1;")
+        self.end_index_input = QLineEdit()
+        self.end_index_input.setPlaceholderText("0") # Default to 0 (meaning all)
+        self.end_index_input.setText("0")
+        self.end_index_input.setFont(QFont("Segoe UI", 9))
+        self.end_index_input.setStyleSheet(self.get_input_style())
+        self.end_index_input.setFixedWidth(80) # Make it smaller
+        end_index_layout.addWidget(end_label)
+        end_index_layout.addWidget(self.end_index_input)
+
+        index_layout.addLayout(start_index_layout)
+        index_layout.addLayout(end_index_layout)
+        index_layout.addStretch(1) # Push inputs to the left
+
+        input_layout.addLayout(index_layout) # Add the combined layout
+
         # Style Selection
         category_layout = QVBoxLayout()
         category_label = QLabel("Refinement Style:")
@@ -509,7 +544,28 @@ Text:"""
             msg_box.exec_()
             return False
 
-        return True
+        # Validate Start/End Index (NEW)
+        try:
+            start_index_str = self.start_index_input.text().strip()
+            self.start_index = int(start_index_str) if start_index_str else 1 # Default to 1 if empty
+            if self.start_index < 1:
+                raise ValueError("Start index must be 1 or greater.")
+
+            end_index_str = self.end_index_input.text().strip()
+            self.end_index = int(end_index_str) if end_index_str else 0 # Default to 0 if empty
+            if self.end_index != 0 and self.end_index < self.start_index:
+                raise ValueError("End index must be 0 (for all) or greater than/equal to start index.")
+
+        except ValueError as e:
+            msg_box = QMessageBox()
+            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setText(f"Invalid Start/End Index: {e}")
+            msg_box.setWindowTitle("Invalid Index")
+            msg_box.exec_()
+            return False
+
+        return True # If all validations pass
 
     def set_processing_state(self, processing):
         self.is_processing = processing
@@ -567,7 +623,9 @@ Text:"""
 
         self.extraction_thread = TranscriptExtractionThread(
             self.url_input.text(),
-            transcript_output
+            transcript_output,
+            self.start_index,
+            self.end_index
         )
 
         self.extraction_thread.progress_update.connect(self.progress_bar.setValue)
@@ -670,28 +728,29 @@ class TranscriptExtractionThread(QThread):
     extraction_complete = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, playlist_url, output_file):
+    def __init__(self, playlist_url, output_file, start_index=1, end_index=0):
         super().__init__()
         self.playlist_url = playlist_url
         self.output_file = output_file
+        self.start_index = start_index
+        self.end_index = end_index # 0 means process all/to the end
         self._is_running = True
 
     def run(self):
         try:
             url = self.playlist_url
             playlist_name = "Unknown Playlist/Video" # Default name
-            video_urls = []
-            total_videos = 0
+            all_video_urls = [] # Renamed to reflect it holds all URLs initially
+            original_total_videos = 0
 
             if "playlist?list=" in url: # Check if it's a playlist URL
                 try:
                     playlist = Playlist(url)
-                    # Now try accessing properties that might trigger the error
                     try:
-                        video_urls = list(playlist.video_urls) # Convert generator to list early
-                        total_videos = len(video_urls)
+                        all_video_urls = list(playlist.video_urls) # Get all URLs
+                        original_total_videos = len(all_video_urls)
                         playlist_name = playlist.title
-                        self.status_update.emit(f"Found playlist: {playlist_name} with {total_videos} videos.")
+                        self.status_update.emit(f"Found playlist: {playlist_name} with {original_total_videos} videos.")
                     except KeyError as ke:
                         error_msg = f"Extraction error (Accessing Playlist Details): {str(ke)}. YouTube structure likely changed. Try updating pytube (`pip install --upgrade pytube`) or check pytube issues."
                         self.error_occurred.emit(error_msg)
@@ -711,8 +770,8 @@ class TranscriptExtractionThread(QThread):
                     return
 
             elif "watch?v=" in url: # Check if it's a single video URL
-                video_urls = [url] # Treat it as a playlist of one video
-                total_videos = 1
+                all_video_urls = [url]
+                original_total_videos = 1
                 # Try to get video title for single video case (optional, less likely to fail here)
                 try:
                     from pytube import YouTube
@@ -726,13 +785,46 @@ class TranscriptExtractionThread(QThread):
                 self.error_occurred.emit(f"Invalid URL format: {url}")
                 return
 
-            if not video_urls: # If we failed to get video_urls earlier
+            if not all_video_urls: # If we failed to get video_urls earlier
                 self.error_occurred.emit(f"Could not retrieve video URLs for {url}. See previous errors.")
                 return
 
+            # --- Slicing Logic (NEW) ---
+            # Adjust for 0-based slicing and user's 1-based input
+            slice_start = self.start_index - 1
+            if slice_start < 0:
+                slice_start = 0 # Ensure start is not negative
+
+            if self.end_index == 0: # 0 means process to the end
+                slice_end = None # Slicing with None goes to the end
+            else:
+                slice_end = self.end_index # Already 1-based, slice goes up to but not including end
+
+            # Apply the slice
+            video_urls_to_process = all_video_urls[slice_start:slice_end]
+            total_videos = len(video_urls_to_process) # This is the number we'll actually process
+
+            if total_videos == 0:
+                 self.status_update.emit("No videos found in the specified range.")
+                 # Emit completion signal with empty file or handle as needed
+                 # For now, just write header and complete
+                 with open(self.output_file, 'w', encoding='utf-8') as f:
+                     f.write(f"Playlist Name: {playlist_name}\n")
+                     f.write(f"(No videos processed for range {self.start_index} to {self.end_index if self.end_index != 0 else 'End'})\n")
+                 self.extraction_complete.emit(self.output_file)
+                 return
+
+
+            self.status_update.emit(f"Processing {total_videos} videos (range {self.start_index} to {self.end_index if self.end_index != 0 else 'End'} of {original_total_videos}).")
+            # --- End Slicing Logic ---
+
+
             with open(self.output_file, 'w', encoding='utf-8') as f:
-                f.write(f"Playlist Name: {playlist_name}\n\n")
-                for index, video_url in enumerate(video_urls, 1):
+                f.write(f"Playlist Name: {playlist_name}\n")
+                f.write(f"Processing Range: {self.start_index} to {self.end_index if self.end_index != 0 else 'End'}\n\n") # Add range info
+
+                # Iterate over the *sliced* list
+                for index, video_url in enumerate(video_urls_to_process, 1):
                     if not self._is_running:
                         return
 
@@ -744,11 +836,17 @@ class TranscriptExtractionThread(QThread):
                         f.write(f"Video URL: {video_url}\n")
                         f.write(transcript + '\n\n')
 
+                        # Progress is now based on the sliced list size
                         progress_percent = int((index / total_videos) * 100)
                         self.progress_update.emit(progress_percent)
-                        self.status_update.emit(f"Extracted transcript for video {index}/{total_videos}")
+                        # Use the actual video number from the original list for status if desired,
+                        # but using 'index' relative to the slice is simpler and clearer for progress.
+                        original_index = slice_start + index # Calculate original index if needed for logs/status
+                        self.status_update.emit(f"Extracted transcript for video {index}/{total_videos} (Original Playlist Index: {original_index})")
                     except Exception as video_error:
-                        self.status_update.emit(f"Error processing {video_url}: {str(video_error)}")
+                        original_index = slice_start + index
+                        self.status_update.emit(f"Error processing video {index}/{total_videos} (Original Playlist Index: {original_index}, URL: {video_url}): {str(video_error)}")
+
 
             self.extraction_complete.emit(self.output_file)
         except Exception as e: # General fallback catch
