@@ -327,11 +327,12 @@ Text:"""
         
 
 
-        # File Inputs
-        self.create_file_input(input_layout, "   Transcript Output File:", "Choose File",
+        # File Inputs (MODIFIED Labels/Placeholders)
+        self.create_file_input(input_layout, "   Transcript Output File (Optional):", "Choose File",
                              "transcript_file_input", self.select_transcript_output_file)
-        self.create_directory_input(input_layout, "   Gemini Output Folder:", "Choose Folder",
-                             "gemini_output_dir_input", self.select_gemini_output_directory)
+        # Rename Gemini folder label (MODIFIED)
+        self.create_directory_input(input_layout, "   Summary Output Folder:", "Choose Folder",
+                             "summary_output_dir_input", self.select_summary_output_directory)
 
         # API Key Input
         api_key_layout = QVBoxLayout()
@@ -421,7 +422,7 @@ Text:"""
         input_field = QLineEdit()
         input_field.setObjectName(field_name)
         input_field.setReadOnly(True)
-        input_field.setPlaceholderText(f"Select {label_text.split(':')[0]} file")
+        input_field.setPlaceholderText(f"Optional: Select file or leave blank for default")
         input_field.setStyleSheet(self.get_input_style())
 
         button = QPushButton(button_text)
@@ -540,30 +541,34 @@ Text:"""
             msg_box.exec_()
             return False
 
-        if not self.transcript_file_input.text().endswith(".txt"):
+        # Validate Transcript file only if provided (MODIFIED)
+        transcript_file_path = self.transcript_file_input.text().strip()
+        if transcript_file_path and not transcript_file_path.endswith(".txt"):
             msg_box = QMessageBox()
             msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;") # Style QMessageBox
             msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setText("Transcript output file must be a .txt file")
+            msg_box.setText("If specified, Transcript output file must be a .txt file")
             msg_box.setWindowTitle("Invalid File")
             msg_box.exec_()
             return False
 
-        # Validate Gemini output directory (MODIFIED)
-        gemini_dir = self.gemini_output_dir_input.text().strip()
-        if not gemini_dir:
+        # Validate Summary output directory (MODIFIED name for clarity, logic same)
+        summary_dir = self.summary_output_dir_input.text().strip()
+        if not summary_dir: # This is now mandatory
             msg_box = QMessageBox()
             msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
             msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setText("Please select a folder for the Gemini output.")
+            # Update message to reflect new label (MODIFIED)
+            msg_box.setText("Please select a Summary Output Folder.")
             msg_box.setWindowTitle("Output Folder Required")
             msg_box.exec_()
             return False
-        if not os.path.isdir(gemini_dir): # Check if it's a valid directory
+        if not os.path.isdir(summary_dir): # Check if it's a valid directory
              msg_box = QMessageBox()
              msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
              msg_box.setIcon(QMessageBox.Warning)
-             msg_box.setText("The selected Gemini output path is not a valid folder.")
+             # Update message to reflect new label (MODIFIED)
+             msg_box.setText("The selected Summary Output path is not a valid folder.")
              msg_box.setWindowTitle("Invalid Folder")
              msg_box.exec_()
              return False
@@ -616,7 +621,7 @@ Text:"""
 
         # Add the new directory input and remove the old file input (MODIFIED)
         inputs = [self.url_input, self.transcript_file_input,
-                self.gemini_output_dir_input, self.api_key_input, self.language_input,
+                self.summary_output_dir_input, self.api_key_input, self.language_input,
                 self.start_index_input, self.end_index_input, # Add start/end inputs if they exist
                 self.category_combo, self.chunk_size_slider] # Disable category/chunk during processing
         for input_field in inputs:
@@ -676,12 +681,21 @@ Text:"""
         self.progress_bar.setValue(0)
         self.status_display.clear()
 
-        transcript_output = self.transcript_file_input.text() or \
-                          f"transcript_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+        # Determine transcript output path (MODIFIED)
+        transcript_input_path = self.transcript_file_input.text().strip()
+        summary_output_dir = self.summary_output_dir_input.text().strip() # Already validated
+
+        if transcript_input_path:
+            transcript_output = transcript_input_path
+        else:
+            # Default to transcript.txt inside the summary output folder
+            transcript_output = os.path.join(summary_output_dir, "transcript.txt")
+            self.status_display.append(f"<font color='#bdc3c7'>Transcript file not specified, using default: {transcript_output}</font>")
+
 
         self.extraction_thread = TranscriptExtractionThread(
             self.url_input.text(),
-            transcript_output,
+            transcript_output, # Pass the determined path
             self.start_index,
             self.end_index
         )
@@ -703,7 +717,7 @@ Text:"""
         selected_prompt = self.prompts[self.selected_category]
         self.gemini_thread = GeminiProcessingThread(
             transcript_file,
-            self.gemini_output_dir_input.text(),
+            self.summary_output_dir_input.text(),
             self.api_key_input.text(),
             self.selected_model_name,
             output_language,
@@ -767,14 +781,14 @@ Text:"""
     def select_transcript_output_file(self):
         self.select_output_file("Select Transcript Output File", self.transcript_file_input)
 
-    def select_gemini_output_directory(self):
+    def select_summary_output_directory(self):
         options = QFileDialog.Options()
         options |= QFileDialog.ShowDirsOnly # Ensure only directories can be selected
         dir_path = QFileDialog.getExistingDirectory(
             self, "Select Gemini Output Folder", "", options=options)
         if dir_path:
             # Use the attribute name set in create_directory_input
-            self.gemini_output_dir_input.setText(dir_path)
+            self.summary_output_dir_input.setText(dir_path)
 
     def select_output_file(self, title, field):
         # This function is now only used for the transcript file
