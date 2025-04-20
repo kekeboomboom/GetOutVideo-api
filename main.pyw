@@ -1,7 +1,33 @@
+"""
+YouTube Playlist to Formatted Text (WatchYT4Me)
+
+This application extracts transcripts from YouTube playlists or individual videos
+and processes them using the Google Gemini API to create well-formatted, readable
+markdown documents.
+
+Main features:
+- Extract transcripts from YouTube playlists or single videos
+- Process text with multiple refinement styles (Balanced, Summary, Educational, etc.)
+- Configure chunk size for optimal API processing
+- Customize output language
+- Select specific video ranges from playlists
+- Save outputs to customizable locations
+
+The application uses a multi-threaded approach to maintain UI responsiveness:
+1. TranscriptExtractionThread: Extracts video transcripts from YouTube
+2. GeminiProcessingThread: Processes transcripts with the Gemini API
+
+Requirements:
+- PyQt5 for the user interface
+- pytubefix for accessing YouTube data
+- youtube_transcript_api for extracting transcripts
+- google.generativeai for text processing
+"""
+
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QPushButton, QProgressBar, QTextEdit, QFileDialog, QMessageBox,
-                             QSlider, QGroupBox, QCheckBox)  # CHANGED: Removed QComboBox, added QCheckBox
+                             QSlider, QGroupBox, QCheckBox, QGridLayout)  # CHANGED: Removed QComboBox, added QCheckBox and QGridLayout
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
@@ -17,6 +43,20 @@ load_dotenv(".env")
 
 
 class MainWindow(QMainWindow):
+    """
+    Main application window for the YouTube Playlist to Text converter.
+    
+    This class provides the user interface for the application, allowing users to:
+    - Input a YouTube playlist or video URL
+    - Specify language and processing preferences
+    - Select refinement styles for text processing 
+    - Configure output settings
+    - View progress and status updates during processing
+    
+    The application extracts video transcripts from YouTube and processes them
+    using the Gemini API to create formatted and refined output documents.
+    """
+    
     DEFAULT_CHUNK_SIZE = 70000  # Define default chunk size as a class variable
 
     def __init__(self):
@@ -97,60 +137,33 @@ class MainWindow(QMainWindow):
 
         self.initUI()
 
-
-    def get_combobox_style(self):
-        """No longer used for QComboBox, but kept in case you need a similar style for checkboxes or other combos."""
-        return """
-            QComboBox {
-                background-color: #34495e;
-                border: 2px solid #3498db;
-                border-radius: 5px;
-                color: #ecf0f1;
-                padding: 0px;
-                font-size: 10pt;
-            }
-            QComboBox:!editable, QComboBox::drop-down:editable {
-                 background: #34495e;
-            }
-            QComboBox:on {
-                border-bottom-left-radius: 0px;
-                border-bottom-right-radius: 0px;
-            }
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 20px;
-                border-left-width: 1px;
-                border-left-color: darkgray;
-                border-left-style: solid;
-                border-top-right-radius: 3px;
-                border-bottom-right-radius: 3px;
-            }
-            QComboBox::down-arrow {
-                image: url(down_arrow.png);
-            }
-            QComboBox::down-arrow:on {
-                top: 1px;
-                left: 1px;
-            }
-            QComboBox QAbstractItemView {
-                border: 2px solid #3498db;
-                border-radius: 5px;
-                background-color: #2c3e50;
-                color: #ecf0f1;
-                selection-background-color: #3498db;
-                selection-color: #ecf0f1;
-            }
-        """
-
     @pyqtSlot(int)
     def update_chunk_size_label(self, value):
+        """
+        Updates the displayed chunk size value when the slider is moved.
+        
+        Args:
+            value (int): The new chunk size value from the slider
+        """
         self.chunk_size_value_label.setText(str(value))
 
     def initUI(self):
-        self.setWindowTitle("YouTube Playlist Transcript & Gemini Refinement Extractor")
+        """
+        Initializes the user interface of the application.
+        
+        Creates and configures all UI components including:
+        - Input fields for URL, language, and API settings
+        - Refinement style selection checkboxes
+        - Chunk size slider for controlling text processing
+        - File input/output selection fields
+        - Progress display and status windows
+        - Control buttons for starting/canceling operations
+        
+        Also applies style settings and layouts to create a modern UI appearance.
+        """
+        self.setWindowTitle("WatchYT4Me: From YouTube Playlist Transcripts to Refined Markdown Docs")
         self.setMinimumSize(900, 850)
-        self.apply_dark_mode()
+        self.apply_modern_style()
         self.showFullScreen()
 
         main_layout = QVBoxLayout()
@@ -158,29 +171,30 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(15)
 
         # Title Section
-        title_label = QLabel("YouTube Playlist Transcript & Gemini Refinement Extractor")
+        title_label = QLabel("WatchYT4Me: From YouTube Playlist Transcripts to Refined Markdown Docs")
         title_label.setFont(QFont("Segoe UI", 18, QFont.Bold))
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
-            color: #2ecc71;
+            color: white;
             padding: 10px;
             border-radius: 8px;
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 #2c3e50, stop:1 #3498db);
+            background: #e74c3c;
         """)
         main_layout.addWidget(title_label)
 
         # Input Container
         input_container = QWidget()
-        input_container.setStyleSheet("background-color: #2c3e50; border-radius: 10px; padding: 10px;")
+        input_container.setStyleSheet("background-color: #f5f5f5; border-radius: 10px; padding: 15px;")
         input_layout = QVBoxLayout(input_container)
-        input_layout.setSpacing(1)
+        input_layout.setSpacing(8)
 
         # Playlist URL Input
         url_layout = QVBoxLayout()
+        url_layout.setContentsMargins(0, 0, 0, 0)
+        url_layout.setSpacing(0)
         url_label = QLabel("YouTube URL (Playlist or Video):")
         url_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        url_label.setStyleSheet("color: #ecf0f1;")
+        url_label.setStyleSheet("color: #333333;")
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("Enter YouTube playlist or video URL (e.g., https://www.youtube.com/playlist?list=... or https://www.youtube.com/watch?v=...)")
         self.url_input.setFont(QFont("Segoe UI", 9))
@@ -189,82 +203,125 @@ class MainWindow(QMainWindow):
         url_layout.addWidget(self.url_input)
         input_layout.addLayout(url_layout)
 
-        # Language Input
+        # Language and Index Inputs in one row
+        lang_and_index_layout = QHBoxLayout()
+        lang_and_index_layout.setSpacing(0)
+
+        # Language Input (left side)
         language_layout = QVBoxLayout()
+        language_layout.setContentsMargins(0, 0, 0, 0)
+        language_layout.setSpacing(0)
         language_label = QLabel("Output Language:")
         language_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        language_label.setStyleSheet("color: #ecf0f1;")
+        language_label.setStyleSheet("color: #333333;")
         self.language_input = QLineEdit()
         self.language_input.setPlaceholderText("e.g., English, Spanish, French")
         self.language_input.setFont(QFont("Segoe UI", 9))
         self.language_input.setStyleSheet(self.get_input_style())
-
         self.language_input.setText(os.environ.get("LANGUAGE", ""))
         language_layout.addWidget(language_label)
         language_layout.addWidget(self.language_input)
-        input_layout.addLayout(language_layout)
+        lang_and_index_layout.addLayout(language_layout)
 
-        # Start/End Video Index Input
+        # Start/End Video Index Input (right side)
+        index_container = QVBoxLayout()
+        index_container.setSpacing(0)
+        
+        # Index Label
+        index_label = QLabel("Video Range:")
+        index_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        index_label.setStyleSheet("color: #333333; margin-bottom: -5px; padding: 0px;")
+        index_container.addWidget(index_label)
+        
+        # Index inputs in one row
         index_layout = QHBoxLayout()
+        index_layout.setSpacing(0)
 
-        start_index_layout = QVBoxLayout()
-        start_label = QLabel("Start Video Index:")
-        start_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        start_label.setStyleSheet("color: #ecf0f1;")
+        # Start Index
+        start_layout = QHBoxLayout()
+        start_layout.setSpacing(0)
+        start_label = QLabel("Start:")
+        start_label.setStyleSheet("color: #333333;")
         self.start_index_input = QLineEdit()
         self.start_index_input.setPlaceholderText("1")
         self.start_index_input.setText("1")
         self.start_index_input.setFont(QFont("Segoe UI", 9))
         self.start_index_input.setStyleSheet(self.get_input_style())
-        self.start_index_input.setFixedWidth(80)
-        start_index_layout.addWidget(start_label)
-        start_index_layout.addWidget(self.start_index_input)
-
-        end_index_layout = QVBoxLayout()
-        end_label = QLabel("End Video Index (0 for all):")
-        end_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        end_label.setStyleSheet("color: #ecf0f1;")
+        self.start_index_input.setFixedWidth(60)
+        start_layout.addWidget(start_label)
+        start_layout.addWidget(self.start_index_input)
+        
+        # End Index
+        end_layout = QHBoxLayout()
+        end_layout.setSpacing(0)
+        end_label = QLabel("End (0 for all):")
+        end_label.setStyleSheet("color: #333333;")
         self.end_index_input = QLineEdit()
         self.end_index_input.setPlaceholderText("0")
         self.end_index_input.setText("0")
         self.end_index_input.setFont(QFont("Segoe UI", 9))
         self.end_index_input.setStyleSheet(self.get_input_style())
-        self.end_index_input.setFixedWidth(80)
-        end_index_layout.addWidget(end_label)
-        end_index_layout.addWidget(self.end_index_input)
-
-        index_layout.addLayout(start_index_layout)
-        index_layout.addLayout(end_index_layout)
+        self.end_index_input.setFixedWidth(60)
+        end_layout.addWidget(end_label)
+        end_layout.addWidget(self.end_index_input)
+        
+        index_layout.addLayout(start_layout)
+        index_layout.addLayout(end_layout)
         index_layout.addStretch(1)
-        input_layout.addLayout(index_layout)
+        
+        index_container.addLayout(index_layout)
+        lang_and_index_layout.addLayout(index_container)
+        input_layout.addLayout(lang_and_index_layout)
 
-        # --- CHANGED: Replaced single ComboBox with multiple checkboxes in a QGroupBox ---
+        # --- Refinement Styles in horizontal layout ---
         style_groupbox = QGroupBox("Refinement Styles (Select one or more)")
-        style_groupbox.setStyleSheet("QGroupBox { color: #ecf0f1; font-weight: bold; }")
-        style_layout = QVBoxLayout()
+        style_groupbox.setStyleSheet("QGroupBox { color: #333333; font-weight: bold; margin-top: 7px; }")
+        style_layout = QGridLayout()
+        style_layout.setSpacing(0)
 
         # Store checkboxes in a dict for easy reference
         self.style_checkboxes = {}
-        for style_name in self.prompts.keys():
+        style_keys = list(self.prompts.keys())
+        
+        # Arrange checkboxes in a grid layout - 3 columns
+        row, col = 0, 0
+        columns = 3
+        for style_name in style_keys:
             cb = QCheckBox(style_name)
-            cb.setStyleSheet("color: #ecf0f1; font-size: 10pt;")
-            style_layout.addWidget(cb)
+            cb.setStyleSheet("color: #333333; font-size: 10pt;")
+            style_layout.addWidget(cb, row, col)
             self.style_checkboxes[style_name] = cb
+            col += 1
+            if col >= columns:
+                col = 0
+                row += 1
 
         style_groupbox.setLayout(style_layout)
         input_layout.addWidget(style_groupbox)
-        # --- END CHANGED ---
 
-        # Chunk Size Slider Section
-        chunk_size_layout = QVBoxLayout()
-        chunk_size_layout.setSpacing(2)
+        # Chunk Size with label on the same line as slider
+        chunk_size_container = QWidget()
+        chunk_size_container.setStyleSheet("background-color: #eaeaea; border-radius: 5px; padding: 8px;")
+        chunk_size_layout = QVBoxLayout(chunk_size_container)
         chunk_size_layout.setContentsMargins(5, 5, 5, 5)
+        chunk_size_layout.setSpacing(0)
 
+        # Header with value
+        chunk_header_layout = QHBoxLayout()
         chunk_size_label = QLabel("Chunk Size:")
         chunk_size_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        chunk_size_label.setStyleSheet("color: #ecf0f1; margin-bottom: 4px;")
-        chunk_size_layout.addWidget(chunk_size_label)
+        chunk_size_label.setStyleSheet("color: #333333;")
+        
+        self.chunk_size_value_label = QLabel(str(self.DEFAULT_CHUNK_SIZE))
+        self.chunk_size_value_label.setFont(QFont("Segoe UI", 10))
+        self.chunk_size_value_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+        
+        chunk_header_layout.addWidget(chunk_size_label)
+        chunk_header_layout.addWidget(self.chunk_size_value_label)
+        chunk_header_layout.addStretch(1)
+        chunk_size_layout.addLayout(chunk_header_layout)
 
+        # Slider
         self.chunk_size_slider = QSlider(Qt.Horizontal)
         self.chunk_size_slider.setMinimum(5000)
         self.chunk_size_slider.setMaximum(500000)
@@ -272,61 +329,66 @@ class MainWindow(QMainWindow):
         self.chunk_size_slider.valueChanged.connect(self.update_chunk_size_label)
         self.chunk_size_slider.setStyleSheet("""
             QSlider {
-                padding: 0px;
+                padding: 2px 0;
             }
             QSlider::groove:horizontal {
-                height: 4px;
-                margin: 2px 0;
+                border: 1px solid #999999;
+                height: 8px;
+                background: #cccccc;
+                margin: 20px 0;
+                border-radius: 4px;
             }
             QSlider::handle:horizontal {
-                width: 12px;
-                margin: -6px 0px;
+                background: #e74c3c;
+                border: 1px solid #5c5c5c;
+                width: 18px;
+                height: 18px;
+                margin: -6px 0;
+                border-radius: 9px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: #c0392b;
             }
         """)
         chunk_size_layout.addWidget(self.chunk_size_slider)
 
-        self.chunk_size_value_label = QLabel(str(self.DEFAULT_CHUNK_SIZE))
-        self.chunk_size_value_label.setFont(QFont("Segoe UI", 10))
-        self.chunk_size_value_label.setStyleSheet("color: #ecf0f1; margin-top: 4px;")
-        chunk_size_layout.addWidget(self.chunk_size_value_label)
-
+        # Description
         chunk_size_description = QLabel(
-            f"(Maximum number of words given to Gemini per API call. Default: {self.DEFAULT_CHUNK_SIZE} words, approx 1/10 of 1M tokens context window)."
-            " Adjust based on task and content length. Larger chunks may be faster but risk API limits or losing detail."
+            f"(Maximum words per Gemini API call. Default: {self.DEFAULT_CHUNK_SIZE}, approx. 1/10 of 1M tokens context window)"
         )
         chunk_size_description.setFont(QFont("Segoe UI", 8))
-        chunk_size_description.setStyleSheet("color: #bdc3c7; margin-top: 18px; padding: 2px;")
+        chunk_size_description.setStyleSheet("color: #666666;")
         chunk_size_description.setWordWrap(True)
         chunk_size_layout.addWidget(chunk_size_description)
 
-        input_layout.addLayout(chunk_size_layout)
+        input_layout.addWidget(chunk_size_container)
 
         # File Inputs
         self.create_file_input(input_layout,
-                               "   Transcript Output File (Optional):",
+                               "Transcript Output File (Optional):",
                                "Choose File",
                                "transcript_file_input",
                                self.select_transcript_output_file)
 
         self.create_directory_input(input_layout,
-                                    "   Summary Output Folder:",
+                                    "Summary Output Folder:",
                                     "Choose Folder",
                                     "summary_output_dir_input",
                                     self.select_summary_output_directory)
 
         # API Key Input
         api_key_layout = QVBoxLayout()
+        api_key_layout.setContentsMargins(0, 0, 0, 0)
+        api_key_layout.setSpacing(0)
         api_key_label = QLabel("Gemini API Key:")
         api_key_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        api_key_label.setStyleSheet("color: #ecf0f1;")
+        api_key_label.setStyleSheet("color: #333333;")
         self.api_key_input = QLineEdit()
         self.api_key_input.setPlaceholderText("Enter your Gemini API key")
         self.api_key_input.setFont(QFont("Segoe UI", 9))
         self.api_key_input.setStyleSheet(self.get_input_style())
         self.api_key_input.setEchoMode(QLineEdit.Password)
-
         self.api_key_input.setText(os.environ.get("API_KEY", ""))
-
         api_key_layout.addWidget(api_key_label)
         api_key_layout.addWidget(self.api_key_input)
         input_layout.addLayout(api_key_layout)
@@ -335,26 +397,28 @@ class MainWindow(QMainWindow):
 
         # Progress Section
         progress_container = QWidget()
-        progress_container.setStyleSheet("background-color: #34495e; border-radius: 10px; padding: 10px;")
+        progress_container.setStyleSheet("background-color: #f5f5f5; border-radius: 10px; padding: 10px;")
         progress_layout = QVBoxLayout(progress_container)
+        progress_layout.setSpacing(10)
 
+        # Progress Bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setMaximum(100)
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setFormat("%p%")
         self.progress_bar.setStyleSheet("""
             QProgressBar {
-                background: #2c3e50;
-                border: 2px solid #3498db;
+                background: #eeeeee;
+                border: 1px solid #cccccc;
                 border-radius: 5px;
                 text-align: center;
-                color: white;
+                color: #333333;
                 font-size: 12px;
+                height: 24px;
             }
             QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #3498db, stop:1 #2ecc71);
-                border-radius: 3px;
+                background: #27ae60;
+                border-radius: 5px;
             }
         """)
         progress_layout.addWidget(self.progress_bar)
@@ -363,10 +427,10 @@ class MainWindow(QMainWindow):
         self.status_display = QTextEdit()
         self.status_display.setReadOnly(True)
         self.status_display.setStyleSheet("""
-            background-color: #2c3e50;
-            border: 2px solid #3498db;
+            background-color: white;
+            border: 1px solid #cccccc;
             border-radius: 5px;
-            color: #ecf0f1;
+            color: #333333;
             font-size: 12px;
             padding: 8px;
         """)
@@ -378,11 +442,11 @@ class MainWindow(QMainWindow):
         control_layout.setSpacing(20)
 
         self.extract_button = QPushButton("Start Processing")
-        self.extract_button.setStyleSheet(self.get_button_style("#2ecc71", "#27ae60"))
+        self.extract_button.setStyleSheet(self.get_button_style("#e74c3c", "#c0392b"))
         self.extract_button.clicked.connect(self.start_extraction_and_refinement)
 
         self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.setStyleSheet(self.get_button_style("#e74c3c", "#c0392b"))
+        self.cancel_button.setStyleSheet(self.get_button_style("#7f8c8d", "#34495e"))
         self.cancel_button.clicked.connect(self.cancel_processing)
         self.cancel_button.setEnabled(False)
 
@@ -396,8 +460,32 @@ class MainWindow(QMainWindow):
         self.center()
 
     def create_file_input(self, parent_layout, label_text, button_text, field_name, handler):
-        layout = QHBoxLayout()
-
+        """
+        Creates a file input component with label, text field, and button.
+        
+        Args:
+            parent_layout: The layout to add this component to
+            label_text (str): The label text to display above the input field
+            button_text (str): The text to display on the select button
+            field_name (str): The object name for the input field (for referencing later)
+            handler: The function to call when the select button is clicked
+            
+        This creates a standardized file input UI component consisting of a label,
+        a read-only text field to show the selected file path, and a button to open
+        a file selection dialog.
+        """
+        layout = QVBoxLayout()
+        layout.setSpacing(0)
+        
+        font = QFont("Segoe UI", 10, QFont.Bold)
+        label = QLabel(label_text)
+        label.setFont(font)
+        label.setStyleSheet("color: #333333;")
+        layout.addWidget(label)
+        
+        input_row = QHBoxLayout()
+        input_row.setSpacing(10)
+        
         input_field = QLineEdit()
         input_field.setObjectName(field_name)
         input_field.setReadOnly(True)
@@ -407,22 +495,40 @@ class MainWindow(QMainWindow):
         button = QPushButton(button_text)
         button.setStyleSheet(self.get_button_style("#3498db", "#2980b9"))
         button.clicked.connect(handler)
+        button.setFixedWidth(120)
 
-        layout.addWidget(input_field)
-        layout.addWidget(button)
+        input_row.addWidget(input_field)
+        input_row.addWidget(button)
+        layout.addLayout(input_row)
 
-        font = QFont("Segoe UI", 10, QFont.Bold)
-        label = QLabel(label_text)
-        label.setFont(font)
-        label.setStyleSheet("padding: 0px;")
-
-        parent_layout.addWidget(label)
         parent_layout.addLayout(layout)
-
         setattr(self, field_name, input_field)
 
     def create_directory_input(self, parent_layout, label_text, button_text, field_name, handler):
-        layout = QHBoxLayout()
+        """
+        Creates a directory input component with label, text field, and button.
+        
+        Args:
+            parent_layout: The layout to add this component to
+            label_text (str): The label text to display above the input field
+            button_text (str): The text to display on the select button
+            field_name (str): The object name for the input field (for referencing later)
+            handler: The function to call when the select button is clicked
+            
+        Similar to create_file_input, but specifically for selecting directories
+        rather than files.
+        """
+        layout = QVBoxLayout()
+        layout.setSpacing(0)
+        
+        font = QFont("Segoe UI", 10, QFont.Bold)
+        label = QLabel(label_text)
+        label.setFont(font)
+        label.setStyleSheet("color: #333333;")
+        layout.addWidget(label)
+        
+        input_row = QHBoxLayout()
+        input_row.setSpacing(10)
 
         input_field = QLineEdit()
         input_field.setObjectName(field_name)
@@ -433,64 +539,106 @@ class MainWindow(QMainWindow):
         button = QPushButton(button_text)
         button.setStyleSheet(self.get_button_style("#3498db", "#2980b9"))
         button.clicked.connect(handler)
+        button.setFixedWidth(140)
 
-        layout.addWidget(input_field)
-        layout.addWidget(button)
+        input_row.addWidget(input_field)
+        input_row.addWidget(button)
+        layout.addLayout(input_row)
 
-        font = QFont("Segoe UI", 10, QFont.Bold)
-        label = QLabel(label_text)
-        label.setFont(font)
-        label.setStyleSheet("padding: 0px;")
-
-        parent_layout.addWidget(label)
         parent_layout.addLayout(layout)
-
         setattr(self, field_name, input_field)
 
     def get_input_style(self):
+        """
+        Returns the CSS styling for input fields.
+        
+        Returns:
+            str: CSS stylesheet string for styling input elements uniformly
+            
+        This provides consistent styling for all input fields across the application,
+        including focus and disabled states.
+        """
         return """
             QLineEdit {
-                background: #34495e;
-                border: 2px solid #3498db;
-                border-radius: 5px;
-                color: #ecf0f1;
-                padding: 2px;
+                background: white;
+                margin-left: 20px;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                color: #333333;
+                padding: 6px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #e74c3c;
             }
             QLineEdit:disabled {
-                background: #2c3e50;
-                border-color: #7f8c8d;
+                background: #eeeeee;
+                border-color: #cccccc;
+                color: #777777;
             }
         """
 
     def get_button_style(self, color1, color2):
+        """
+        Returns the CSS styling for buttons with the specified colors.
+        
+        Args:
+            color1 (str): The base button color (hex code)
+            color2 (str): The hover/pressed button color (hex code)
+            
+        Returns:
+            str: CSS stylesheet string for styling buttons
+            
+        This allows for consistent button styling while letting different 
+        buttons have different color schemes.
+        """
         return f"""
             QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {color1}, stop:1 {color2});
+                background: {color1};
                 color: white;
                 border: none;
-                border-radius: 5px;
-                padding: 12px 24px;
-                font-size: 15px;
+                border-radius: 4px;
+                padding: 10px 20px;
+                font-size: 14px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {color2}, stop:1 {color1});
+                background: {color2};
+            }}
+            QPushButton:pressed {{
+                background: {color2};
+                padding-top: 11px;
+                padding-bottom: 9px;
             }}
             QPushButton:disabled {{
-                background: #95a5a6;
-                color: #7f8c8d;
+                background: #cccccc;
+                color: #888888;
             }}
         """
 
-    def apply_dark_mode(self):
+    def apply_modern_style(self):
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #2c3e50;
+                background-color: #e6e6e6;
             }
             QLabel {
-                color: #ecf0f1;
+                color: #333333;
+            }
+            QGroupBox {
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                margin-top: 12px;
+                padding: 10px;
+                background: white;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+                background: white;
+            }
+            QMessageBox {
+                background-color: white;
+                color: #333333;
             }
         """)
 
@@ -501,12 +649,28 @@ class MainWindow(QMainWindow):
         self.move(frame.topLeft())
 
     def validate_inputs(self):
+        """
+        Validates all user inputs before starting the processing.
+        
+        Returns:
+            bool: True if all inputs are valid, False otherwise
+            
+        Performs validation checks on:
+        - URL format (must be a valid YouTube playlist or video URL)
+        - Selected refinement styles (at least one must be selected)
+        - Output directory (must be a valid directory)
+        - API key (must be provided)
+        - Language (must be specified)
+        - Start/end indices (must be valid numbers with start <= end)
+        
+        Shows appropriate error messages to the user when validation fails.
+        """
         url_text = self.url_input.text()
 
         if not (url_text.startswith("https://www.youtube.com/playlist") or
                 url_text.startswith("https://www.youtube.com/watch?v=")):
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText("Please enter a valid YouTube playlist URL or single video URL.")
             msg_box.setWindowTitle("Invalid URL")
@@ -517,7 +681,7 @@ class MainWindow(QMainWindow):
         transcript_file_path = self.transcript_file_input.text().strip()
         if transcript_file_path and not transcript_file_path.endswith(".txt"):
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText("If specified, Transcript output file must be a .txt file")
             msg_box.setWindowTitle("Invalid File")
@@ -528,7 +692,7 @@ class MainWindow(QMainWindow):
         summary_dir = self.summary_output_dir_input.text().strip()
         if not summary_dir:
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText("Please select a Summary Output Folder.")
             msg_box.setWindowTitle("Output Folder Required")
@@ -536,7 +700,7 @@ class MainWindow(QMainWindow):
             return False
         if not os.path.isdir(summary_dir):
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText("The selected Summary Output path is not a valid folder.")
             msg_box.setWindowTitle("Invalid Folder")
@@ -545,7 +709,7 @@ class MainWindow(QMainWindow):
 
         if not self.api_key_input.text().strip():
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText("Please enter your Gemini API key")
             msg_box.setWindowTitle("API Key Required")
@@ -554,7 +718,7 @@ class MainWindow(QMainWindow):
 
         if not self.language_input.text().strip():
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText("Please specify the output language")
             msg_box.setWindowTitle("Language Required")
@@ -564,7 +728,7 @@ class MainWindow(QMainWindow):
         # Validate that at least one style checkbox is checked
         if not any(cb.isChecked() for cb in self.style_checkboxes.values()):
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText("Please select at least one Refinement Style.")
             msg_box.setWindowTitle("No Style Selected")
@@ -584,7 +748,7 @@ class MainWindow(QMainWindow):
                 raise ValueError("End index must be 0 (for all) or >= start index.")
         except ValueError as e:
             msg_box = QMessageBox()
-            msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+            msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
             msg_box.setText(f"Invalid Start/End Index: {e}")
             msg_box.setWindowTitle("Invalid Index")
@@ -594,6 +758,24 @@ class MainWindow(QMainWindow):
         return True
 
     def set_processing_state(self, processing):
+        """
+        Updates the UI state based on whether processing is active.
+        
+        Args:
+            processing (bool): True if processing is active, False otherwise
+            
+        When processing is active:
+        - Input fields and controls are disabled
+        - Cancel button is enabled
+        - Extract button is disabled
+        
+        When processing is inactive:
+        - Input fields and controls are enabled
+        - Cancel button is disabled
+        - Extract button is enabled
+        
+        This ensures the user cannot modify inputs during processing.
+        """
         self.is_processing = processing
         self.extract_button.setEnabled(not processing)
         self.cancel_button.setEnabled(processing)
@@ -622,7 +804,7 @@ class MainWindow(QMainWindow):
     def select_gemini_model(self):
         """Optional model selector; you can remove or adapt this as needed."""
         msg_box = QMessageBox()
-        msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+        msg_box.setStyleSheet("color: #333333; background-color: white;")
         msg_box.setWindowTitle("Select Gemini Model")
         msg_box.setText("Choose a Gemini model for refinement:")
 
@@ -639,7 +821,13 @@ class MainWindow(QMainWindow):
 
     def get_selected_styles(self):
         """
-        Gather all (style_name, prompt_text) for checkboxes that are checked.
+        Retrieves all selected refinement styles and their prompt templates.
+        
+        Returns:
+            list: A list of tuples (style_name, prompt_text) for each selected style
+            
+        This method collects all style checkboxes that the user has checked and
+        returns their names and associated prompt templates for use in text processing.
         """
         selected = []
         for style_name, cb in self.style_checkboxes.items():
@@ -648,6 +836,20 @@ class MainWindow(QMainWindow):
         return selected
 
     def start_extraction_and_refinement(self):
+        """
+        Starts the main processing workflow for transcript extraction and refinement.
+        
+        This method:
+        1. Validates all user inputs
+        2. Sets up the processing environment
+        3. Creates output directories/files if needed
+        4. Starts the transcript extraction thread
+        5. Updates the UI to reflect processing state
+        
+        The processing is done in separate threads to keep the UI responsive.
+        First, transcripts are extracted from YouTube, then the Gemini API is used
+        to process and refine the text according to the selected styles.
+        """
         if not self.validate_inputs():
             return
 
@@ -688,8 +890,22 @@ class MainWindow(QMainWindow):
         self.extraction_thread.start()
 
     def start_gemini_processing(self, transcript_file):
+        """
+        Starts the Gemini API processing thread after transcript extraction.
+        
+        Args:
+            transcript_file (str): Path to the extracted transcript file
+            
+        This method:
+        1. Resets the progress indicator
+        2. Gets the selected language and chunk size settings
+        3. Collects all selected refinement style prompts
+        4. Creates and starts the GeminiProcessingThread
+        
+        This is typically called automatically when transcript extraction completes.
+        """
         self.progress_bar.setValue(0)
-        self.status_display.append("<font color='#2ecc71'>Transcript extraction complete! Starting Gemini processing...</font>")
+        self.status_display.append("<font color='#27ae60'>Transcript extraction complete! Starting Gemini processing...</font>")
 
         output_language = self.language_input.text()
         current_chunk_size = self.chunk_size_slider.value()
@@ -718,18 +934,20 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(progress_percent)
 
     def update_status(self, message):
-        if "extraction" in message.lower():
-            color = "#3498db"
-        elif "processing" in message.lower():
-            color = "#2ecc71"
+        if "extracted transcript" in message.lower() or "Saved '" in message.lower():
+            color = "#27ae60"  # Green
+        elif "error processing" in message.lower():
+            color = "#e74c3c"  # Red
+        # elif "processing" in message.lower():
+        #     color = "#2980b9"  # Blue
         else:
-            color = "#2ecc71"
+            color = "#333333"  # Dark gray
         self.status_display.append(f"<font color='{color}'>{message}</font>")
 
     def handle_success(self, output_path):
         self.set_processing_state(False)
         msg_box = QMessageBox()
-        msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+        msg_box.setStyleSheet("color: #333333; background-color: white;")
         msg_box.setIcon(QMessageBox.Information)
         msg_box.setText(f"Processing complete!\nOutput files saved in folder:\n{output_path}")
         msg_box.setWindowTitle("Success")
@@ -739,7 +957,7 @@ class MainWindow(QMainWindow):
     def handle_error(self, error):
         self.set_processing_state(False)
         msg_box = QMessageBox()
-        msg_box.setStyleSheet("color: #ecf0f1; background-color: #34495e;")
+        msg_box.setStyleSheet("color: #333333; background-color: white;")
         msg_box.setIcon(QMessageBox.Critical)
         msg_box.setText(error)
         msg_box.setWindowTitle("Error")
@@ -783,12 +1001,37 @@ class MainWindow(QMainWindow):
 
 
 class TranscriptExtractionThread(QThread):
+    """
+    Thread for extracting transcripts from YouTube videos or playlists.
+    
+    This class handles the extraction of transcript data from YouTube in a 
+    separate thread to maintain UI responsiveness. It connects to YouTube using
+    pytubefix and the YouTube Transcript API to download video transcripts.
+    
+    The thread signals progress updates and status messages back to the main UI
+    and handles error conditions appropriately.
+    
+    Signals:
+        progress_update: Emits the percentage of completion (0-100)
+        status_update: Emits status messages as string
+        extraction_complete: Emits the path to the saved transcript file when done
+        error_occurred: Emits error messages as string
+    """
     progress_update = pyqtSignal(int)
     status_update = pyqtSignal(str)
     extraction_complete = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
 
     def __init__(self, playlist_url, output_file, start_index=1, end_index=0):
+        """
+        Initializes the transcript extraction thread.
+        
+        Args:
+            playlist_url (str): URL of the YouTube playlist or single video
+            output_file (str): Path where transcript will be saved
+            start_index (int): Starting video index (1-based) to process
+            end_index (int): Ending video index to process (0 means process all)
+        """
         super().__init__()
         self.playlist_url = playlist_url
         self.output_file = output_file
@@ -797,6 +1040,19 @@ class TranscriptExtractionThread(QThread):
         self._is_running = True
 
     def run(self):
+        """
+        Main execution method for the thread.
+        
+        This method:
+        1. Parses the input URL to determine if it's a playlist or single video
+        2. Retrieves video information and transcripts
+        3. Processes each video in the specified range
+        4. Saves the combined transcripts to the output file
+        5. Emits signals for progress updates and completion
+        
+        Handles various error conditions and edge cases that can occur with 
+        YouTube API access.
+        """
         try:
             url = self.playlist_url
             playlist_name = "Unknown Playlist/Video"
@@ -900,7 +1156,7 @@ class TranscriptExtractionThread(QThread):
                         self.progress_update.emit(progress_percent)
                         self.status_update.emit(
                             f"Extracted transcript for video {index}/{total_videos} "
-                            f"(Original Index: {original_index}) - Title: {video_title[:30]}..."
+                            f"(Original Index: {original_index}) - Title: {video_title[:50]}..."
                         )
                     except Exception as video_error:
                         self.status_update.emit(
@@ -914,10 +1170,33 @@ class TranscriptExtractionThread(QThread):
                 self.error_occurred.emit(f"General extraction error: {str(e)}")
 
     def stop(self):
+        """
+        Stops the thread execution cleanly.
+        
+        Sets the internal running flag to False, which causes the run method
+        to exit gracefully at the next appropriate opportunity.
+        """
         self._is_running = False
 
 
 class GeminiProcessingThread(QThread):
+    """
+    Thread for processing transcripts with the Gemini API.
+    
+    This class handles the refinement and formatting of transcripts using
+    Google's Gemini API. It processes transcript text in chunks to handle
+    large transcripts efficiently and applies multiple refinement styles
+    based on user selection.
+    
+    The thread signals progress updates and status messages back to the main UI
+    and handles error conditions that may occur during API interaction.
+    
+    Signals:
+        progress_update: Emits the percentage of completion (0-100)
+        status_update: Emits status messages as string
+        processing_complete: Emits the path to the output directory when done
+        error_occurred: Emits error messages as string
+    """
     progress_update = pyqtSignal(int)
     status_update = pyqtSignal(str)
     processing_complete = pyqtSignal(str)
@@ -926,6 +1205,21 @@ class GeminiProcessingThread(QThread):
 
     # CHANGED: Accept a list of selected_prompts instead of a single prompt
     def __init__(self, input_file, output_dir, api_key, selected_model_name, output_language, chunk_size, selected_prompts):
+        """
+        Initializes the Gemini processing thread.
+        
+        Args:
+            input_file (str): Path to the transcript file to process
+            output_dir (str): Directory where processed files will be saved
+            api_key (str): Google Gemini API key
+            selected_model_name (str): Name of the Gemini model to use
+            output_language (str): Target language for the output
+            chunk_size (int): Maximum words per API call
+            selected_prompts (list): List of tuples (style_name, prompt_text) for processing
+            
+        The thread initializes with these parameters and sets up logging to track
+        any errors that might occur during processing.
+        """
         super().__init__()
         self.input_file = input_file
         self.output_dir = output_dir
@@ -940,6 +1234,23 @@ class GeminiProcessingThread(QThread):
                             format='%(asctime)s - %(levelname)s - %(message)s')
 
     def run(self):
+        """
+        Main execution method for the Gemini processing thread.
+        
+        This method:
+        1. Configures the Gemini API with the provided key
+        2. Splits the transcript file into individual video sections
+        3. For each video:
+           - Extracts the title, URL, and transcript text
+           - For each selected refinement style:
+              - Splits the transcript into manageable chunks
+              - Processes each chunk with the Gemini API
+              - Combines the responses
+              - Saves the result to a markdown file
+        4. Emits progress and completion signals
+        
+        Error handling includes logging exceptions and emitting error signals.
+        """
         try:
             genai.configure(api_key=self.api_key)
             video_data_chunks = self.split_videos_by_title(self.input_file)
@@ -1037,8 +1348,22 @@ class GeminiProcessingThread(QThread):
             error_message = f"Gemini processing error: {str(e)}"
             self.error_occurred.emit(error_message)
             logging.exception("Gemini processing error")
-
+            
     def split_text_into_chunks(self, text, chunk_size, min_chunk_size=500):
+        """
+        Splits a long text into smaller chunks for API processing.
+        
+        Args:
+            text (str): The full text to split
+            chunk_size (int): Maximum words per chunk
+            min_chunk_size (int): Minimum words for the last chunk
+            
+        Returns:
+            list: List of text chunks
+            
+        If the last chunk is smaller than min_chunk_size, it will be combined with
+        the previous chunk to avoid processing very small text segments.
+        """
         words = text.split()
         chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
         if len(chunks) > 1 and len(chunks[-1].split()) < min_chunk_size:
@@ -1047,6 +1372,19 @@ class GeminiProcessingThread(QThread):
         return chunks
 
     def split_videos_by_title(self, file_path):
+        """
+        Parses the transcript file to extract individual video data.
+        
+        Args:
+            file_path (str): Path to the transcript file
+            
+        Returns:
+            list: List of text blocks, each containing data for a single video
+            
+        Each video block includes the video title, URL, and transcript text.
+        The function handles the specific format created by the transcript extraction
+        process and splits the file at each "Video Title:" marker.
+        """
         try:
             with open(file_path, "r", encoding="utf-8") as file:
                 content = file.read()
@@ -1063,11 +1401,32 @@ class GeminiProcessingThread(QThread):
             return []
 
     def stop(self):
+        """
+        Stops the thread execution cleanly.
+        
+        Sets the internal running flag to False, which causes the run method
+        to exit gracefully at the next appropriate opportunity.
+        """
         self._is_running = False
 
 
 def sanitize_filename(filename):
-    """Removes or replaces characters invalid in Windows/Linux/Mac filenames."""
+    """
+    Removes or replaces characters invalid in Windows/Linux/Mac filenames.
+    
+    Args:
+        filename (str): The original filename that may contain invalid characters
+        
+    Returns:
+        str: A sanitized filename that is safe to use on all major operating systems
+        
+    This function:
+    1. Removes invalid characters (<>:"/\|?*)
+    2. Replaces ampersands with 'and'
+    3. Replaces spaces with underscores
+    4. Truncates to a reasonable maximum length (200 chars)
+    5. Returns 'untitled_video' if the result is empty
+    """
     sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
     sanitized = sanitized.replace('&', 'and')
     sanitized = sanitized.strip()
@@ -1086,6 +1445,12 @@ def sanitize_filename(filename):
 
 
 if __name__ == "__main__":
+    """
+    Main entry point for the application.
+    
+    Creates the main application instance, displays the window,
+    and starts the event loop to handle user interactions.
+    """
     app = QApplication(sys.argv)
     window = MainWindow()
     window.showMaximized()
