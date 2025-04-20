@@ -1146,18 +1146,24 @@ class TranscriptExtractionThread(QThread):
                                 f"Processed video {index}/{total_videos} "
                                 f"(Original Index: {original_index}) - Source: {transcript_source}"
                             )
+                            progress_percent = int((index / total_videos) * 100)
+                            self.progress_update.emit(progress_percent)
+                            self.status_update.emit(
+                                f"Extracted transcript for video {index}/{total_videos} "
+                                f"(Original Index: {original_index}) - Title: {video_title[:100]}..."
+                            )
                         else:
-                             self.status_update.emit(
+                            self.status_update.emit(
                                 f"Skipping video {index}/{total_videos} "
                                 f"(Original Index: {original_index}) - Could not obtain transcript from any source."
                             )
-
-                        progress_percent = int((index / total_videos) * 100)
-                        self.progress_update.emit(progress_percent)
-                        self.status_update.emit(
-                            f"Extracted transcript for video {index}/{total_videos} "
-                            f"(Original Index: {original_index}) - Title: {video_title[:100]}..."
-                        )
+                            progress_percent = int((index / total_videos) * 100)
+                            self.progress_update.emit(progress_percent)
+                            self.status_update.emit(
+                                f"Error processing transcript extraction for video {index}/{total_videos} "
+                                f"(Original Index: {original_index}) - Title: {video_title[:100]}..."
+                            )
+                            
                     except Exception as video_loop_error:
                         # Catch errors specific to processing a single video within the loop
                         self.status_update.emit(
@@ -1413,8 +1419,7 @@ class GeminiProcessingThread(QThread):
         """
         self._is_running = False
 
-
-    def _sanitize_filename(filename):
+    def _sanitize_filename(self, filename):
         """
         Removes or replaces characters invalid in Windows/Linux/Mac filenames.
         
