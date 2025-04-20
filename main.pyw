@@ -1,5 +1,5 @@
 """
-YouTube Playlist to Formatted Text (WatchYT4Me)
+YouTube Playlist to Formatted Text (WatchYTPL4Me)
 
 This application extracts transcripts from YouTube playlists or individual videos
 and processes them using the Google Gemini API to create well-formatted, readable
@@ -27,18 +27,20 @@ Requirements:
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QPushButton, QProgressBar, QTextEdit, QFileDialog, QMessageBox,
-                             QSlider, QGroupBox, QCheckBox, QGridLayout)  # CHANGED: Removed QComboBox, added QCheckBox and QGridLayout
+                             QSlider, QGroupBox, QCheckBox, QGridLayout) 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
 from pytubefix import Playlist, YouTube
-from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 import google.generativeai as genai
 import re
 import logging
 import os
 from dotenv import load_dotenv
 from builtins import KeyError
+from ytvideo2txt import get_transcript_with_ai_stt
+from prompts import text_refinement_prompts
 load_dotenv(".env")
 
 
@@ -63,73 +65,12 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
-
-        # --- CHANGED: Moved from category_combo to multiple checkboxes. ---
-        self.prompts = {
-            "Balanced and Detailed": """Turn the following unorganized text into a well-structured, readable format while retaining EVERY detail, context, and nuance of the original content.
-            Refine the text to improve clarity, grammar, and coherence WITHOUT cutting, summarizing, or omitting any information.
-            The goal is to make the content easier to read and process by:
-
-            - Organizing the content into logical sections with appropriate subheadings.
-            - Using bullet points or numbered lists where applicable to present facts, stats, or comparisons.
-            - Highlighting key terms, names, or headings with bold text for emphasis.
-            - Preserving the original tone, humor, and narrative style while ensuring readability.
-            - Adding clear separators or headings for topic shifts to improve navigation.
-
-            Ensure the text remains informative, capturing the original intent, tone,
-            and details while presenting the information in a format optimized for analysis by both humans and AI.
-            REMEMBER that Details are important, DO NOT overlook Any details, even small ones.
-            All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
-            Format the entire response using Markdown syntax.
-            Text:
-            """,
-
-            "Summary": """Summarize the following transcript into a concise and informative summary. 
-            Identify the core message, main arguments, and key pieces of information presented in the video.
-            The summary should capture the essence of the video's content in a clear and easily understandable way.
-            Aim for a summary that is shorter than the original transcript but still accurately reflects its key points.  
-            Focus on conveying the most important information and conclusions.
-            All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
-            Format the entire response using Markdown syntax.
-            Text: """,
-
-            "Educational": """Transform the following transcript into a comprehensive educational text, resembling a textbook chapter. Structure the content with clear headings, subheadings, and bullet points to enhance readability and organization for educational purposes.
-
-            Crucially, identify any technical terms, jargon, or concepts that are mentioned but not explicitly explained within the transcript. For each identified term, provide a concise definition (no more than two sentences) formatted as a blockquote.  Integrate these definitions strategically within the text, ideally near the first mention of the term, to enhance understanding without disrupting the flow.
-
-            Ensure the text is highly informative, accurate, and retains all the original details and nuances of the transcript. The goal is to create a valuable educational resource that is easy to study and understand.
-
-            All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
-            Format the entire response using Markdown syntax, including the blockquotes for definitions.
-
-            Text:""",
-
-            "Narrative Rewriting": """Rewrite the following transcript into an engaging narrative or story format. Transform the factual or conversational content into a more captivating and readable piece, similar to a short story or narrative article.
-
-            While rewriting, maintain a close adherence to the original subjects and information presented in the video. Do not deviate significantly from the core topics or introduce unrelated elements.  The goal is to enhance engagement and readability through storytelling techniques without altering the fundamental content or message of the video.  Use narrative elements like descriptive language, scene-setting (if appropriate), and a compelling flow to make the information more accessible and enjoyable.
-
-            All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
-            Format the entire response using Markdown syntax for appropriate emphasis or structure (like paragraph breaks).
-
-            Text:""",
-
-            "Q&A Generation": """Generate a set of questions and answers based on the following transcript for self-assessment or review.  For each question, create a corresponding answer.
-
-            Format each question as a level 3 heading using Markdown syntax (### Question Text). Immediately following each question, provide the answer.  This format is designed for foldable sections, allowing users to easily hide and reveal answers for self-testing.
-
-            Ensure the questions are relevant to the key information and concepts in the transcript and that the answers are accurate and comprehensive based on the video content.
-
-            All output must be generated entirely in [Language]. Do not use any other language at any point in the response. Do not include this unorganized text into your response.
-            Format the entire response using Markdown syntax as specified.
-
-            Text:"""
-        }
-
+        self.prompts = text_refinement_prompts
         self.extraction_thread = None
         self.gemini_thread = None
         self.is_processing = False
 
-        self.available_models = ["gemini-2.5-flash-preview-04-17", "gemini-2.5-pro-preview-03-25", "gpt-4.1-mini"]
+        self.available_models = ["gemini-2.5-flash-preview-04-17", "gemini-2.5-pro-preview-03-25"]
         self.selected_model_name = "gemini-2.5-flash-preview-04-17"
 
         # Set the class variable default chunk size using the constant
@@ -161,7 +102,7 @@ class MainWindow(QMainWindow):
         
         Also applies style settings and layouts to create a modern UI appearance.
         """
-        self.setWindowTitle("WatchYT4Me: From YouTube Playlist Transcripts to Refined Markdown Docs")
+        self.setWindowTitle("WatchYTPL4Me: Transform YouTube Playlist into Professional-Quality Documents")
         self.setMinimumSize(900, 850)
         self.apply_modern_style()
         self.showFullScreen()
@@ -171,7 +112,7 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(15)
 
         # Title Section
-        title_label = QLabel("WatchYT4Me: From YouTube Playlist Transcripts to Refined Markdown Docs")
+        title_label = QLabel("WatchYTPL4Me: From YouTube Playlist to Formatted Docs")
         title_label.setFont(QFont("Segoe UI", 18, QFont.Bold))
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
@@ -218,7 +159,7 @@ class MainWindow(QMainWindow):
         self.language_input.setPlaceholderText("e.g., English, Spanish, French")
         self.language_input.setFont(QFont("Segoe UI", 9))
         self.language_input.setStyleSheet(self.get_input_style())
-        self.language_input.setText(os.environ.get("LANGUAGE", ""))
+        self.language_input.setText(os.environ.get("LANGUAGE", "English"))
         language_layout.addWidget(language_label)
         language_layout.addWidget(self.language_input)
         lang_and_index_layout.addLayout(language_layout)
@@ -388,7 +329,7 @@ class MainWindow(QMainWindow):
         self.api_key_input.setFont(QFont("Segoe UI", 9))
         self.api_key_input.setStyleSheet(self.get_input_style())
         self.api_key_input.setEchoMode(QLineEdit.Password)
-        self.api_key_input.setText(os.environ.get("API_KEY", ""))
+        self.api_key_input.setText(os.environ.get("GEMINI_API_KEY", ""))
         api_key_layout.addWidget(api_key_label)
         api_key_layout.addWidget(self.api_key_input)
         input_layout.addLayout(api_key_layout)
@@ -1051,7 +992,7 @@ class TranscriptExtractionThread(QThread):
         5. Emits signals for progress updates and completion
         
         Handles various error conditions and edge cases that can occur with 
-        YouTube API access.
+        YouTube API access. If extraction fails, uses AI STT fallback.
         """
         try:
             url = self.playlist_url
@@ -1132,10 +1073,15 @@ class TranscriptExtractionThread(QThread):
 
                 for index, video_url in enumerate(video_urls_to_process, 1):
                     if not self._is_running:
-                        return
+                        return # Exit if cancelled
+
                     original_index = slice_start + index
+                    video_title = f"Video_{original_index}"
+                    transcript = None # Initialize transcript as None
+                    transcript_source = "Unknown" # To track where the transcript came from
+
                     try:
-                        video_title = f"Video_{original_index}"
+                        # --- Get Video Title ---
                         try:
                             yt = YouTube(video_url)
                             video_title = yt.title
@@ -1144,13 +1090,67 @@ class TranscriptExtractionThread(QThread):
                                 f"Warning: Could not get title for video {original_index} ({video_url}): {str(title_e)}"
                             )
 
+                        # --- Attempt to Get Transcript via Standard API ---
                         video_id = video_url.split("?v=")[1].split("&")[0]
-                        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-                        transcript = ' '.join([t['text'] for t in transcript_list])
+                        try:
+                            self.status_update.emit(
+                                f"Attempting standard transcript extraction for video {index}/{total_videos} "
+                                f"(Original Index: {original_index}) - Title: {video_title[:50]}..."
+                            )
+                            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+                            transcript = ' '.join([t['text'] for t in transcript_list])
+                            transcript_source = "Standard API"
+                            self.status_update.emit(
+                                f"Successfully extracted transcript via Standard API for video {index}/{total_videos}."
+                            )
 
-                        f.write(f"Video Title: {video_title}\n")
-                        f.write(f"Video URL: {video_url}\n")
-                        f.write(transcript + '\n\n')
+                        # --- Fallback to AI STT if Standard API Fails ---
+                        except (TranscriptsDisabled, NoTranscriptFound) as e:
+                            self.status_update.emit(
+                                f"Standard transcript unavailable for video {index}/{total_videos} ({type(e).__name__}). "
+                                f"Attempting AI STT fallback..."
+                            )
+                            try:
+                                transcript = get_transcript_with_ai_stt(video_url, video_title, self.output_file)
+                                if transcript:
+                                    transcript_source = "AI STT Fallback"
+                                    self.status_update.emit(
+                                        f"Successfully obtained transcript via AI STT for video {index}/{total_videos}."
+                                    )
+                                else:
+                                    self.status_update.emit(
+                                        f"AI STT fallback failed or returned no transcript for video {index}/{total_videos}."
+                                    )
+                            except Exception as ai_e:
+                                self.status_update.emit(
+                                    f"Error during AI STT fallback for video {index}/{total_videos}: {str(ai_e)}"
+                                )
+                                transcript = None # Ensure transcript is None if AI fails
+
+                        except Exception as api_general_error:
+                             # Handle other youtube_transcript_api errors if needed, or re-raise
+                             self.status_update.emit(
+                                 f"Error getting transcript via Standard API for video {index}/{total_videos}: {str(api_general_error)}"
+                             )
+                             # Optionally, you could still try AI STT here, or just log and skip
+                             transcript = None
+
+
+                        # --- Write Transcript if Obtained ---
+                        if transcript:
+                            f.write(f"Video Title: {video_title}\n")
+                            f.write(f"Video URL: {video_url}\n")
+                            f.write(f"Transcript Source: {transcript_source}\n") # Indicate source
+                            f.write(transcript + '\n\n')
+                            self.status_update.emit(
+                                f"Processed video {index}/{total_videos} "
+                                f"(Original Index: {original_index}) - Source: {transcript_source}"
+                            )
+                        else:
+                             self.status_update.emit(
+                                f"Skipping video {index}/{total_videos} "
+                                f"(Original Index: {original_index}) - Could not obtain transcript from any source."
+                            )
 
                         progress_percent = int((index / total_videos) * 100)
                         self.progress_update.emit(progress_percent)
@@ -1158,16 +1158,21 @@ class TranscriptExtractionThread(QThread):
                             f"Extracted transcript for video {index}/{total_videos} "
                             f"(Original Index: {original_index}) - Title: {video_title[:100]}..."
                         )
-                    except Exception as video_error:
+                    except Exception as video_loop_error:
+                        # Catch errors specific to processing a single video within the loop
                         self.status_update.emit(
                             f"Error processing video {index}/{total_videos} "
-                            f"(Original Index: {original_index}, URL: {video_url}): {str(video_error)}"
+                            f"(Original Index: {original_index}, URL: {video_url}): {str(video_loop_error)}"
                         )
+                        # Continue to the next video
 
             self.extraction_complete.emit(self.output_file)
-        except Exception as e:
-            if not isinstance(e, KeyError):
-                self.error_occurred.emit(f"General extraction error: {str(e)}")
+
+        except Exception as general_error:
+            # Catch errors occurring outside the video loop (e.g., playlist access)
+            # Exclude KeyError if already handled, or refine based on specific expected errors
+            if not isinstance(general_error, KeyError): # Avoid duplicate reporting if KeyError was handled earlier
+                self.error_occurred.emit(f"General extraction error: {str(general_error)}")
 
     def stop(self):
         """
@@ -1203,7 +1208,6 @@ class GeminiProcessingThread(QThread):
     error_occurred = pyqtSignal(str)
     chunk_size = MainWindow.DEFAULT_CHUNK_SIZE
 
-    # CHANGED: Accept a list of selected_prompts instead of a single prompt
     def __init__(self, input_file, output_dir, api_key, selected_model_name, output_language, chunk_size, selected_prompts):
         """
         Initializes the Gemini processing thread.
@@ -1283,7 +1287,7 @@ class GeminiProcessingThread(QThread):
                     )
                     continue
 
-                sanitized_title = sanitize_filename(video_title)
+                sanitized_title = self._sanitize_filename(video_title)
                 self.status_update.emit(f"\nProcessing Video {video_index + 1}/{total_videos}: {video_title[:50]}...")
                 word_count = len(video_transcript.split())
                 self.status_update.emit(f"Word Count: {word_count} words")
@@ -1292,7 +1296,7 @@ class GeminiProcessingThread(QThread):
                 # Split transcript into sub-chunks
                 video_transcript_chunks = self.split_text_into_chunks(video_transcript, self.chunk_size)
 
-                # CHANGED: For each style, generate an output file named Title [STYLE].md
+                # For each style, generate an output file named Title [STYLE].md
                 for (style_name, style_prompt) in self.selected_prompts:
                     full_video_response = ""
                     previous_response = ""
@@ -1322,7 +1326,7 @@ class GeminiProcessingThread(QThread):
                     # Write out the final file for this style
                     final_output_path = os.path.join(
                         self.output_dir,
-                        f"{sanitized_title} [{style_name}].md"  # CHANGED: append style in brackets
+                        f"{sanitized_title} [{style_name}].md"  # Append style in brackets
                     )
                     try:
                         with open(final_output_path, "w", encoding="utf-8") as final_output_file:
@@ -1410,38 +1414,38 @@ class GeminiProcessingThread(QThread):
         self._is_running = False
 
 
-def sanitize_filename(filename):
-    """
-    Removes or replaces characters invalid in Windows/Linux/Mac filenames.
-    
-    Args:
-        filename (str): The original filename that may contain invalid characters
+    def _sanitize_filename(filename):
+        """
+        Removes or replaces characters invalid in Windows/Linux/Mac filenames.
         
-    Returns:
-        str: A sanitized filename that is safe to use on all major operating systems
-        
-    This function:
-    1. Removes invalid characters (<>:"/\|?*)
-    2. Replaces ampersands with 'and'
-    3. Replaces spaces with underscores
-    4. Truncates to a reasonable maximum length (200 chars)
-    5. Returns 'untitled_video' if the result is empty
-    """
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
-    sanitized = sanitized.replace('&', 'and')
-    sanitized = sanitized.strip()
-    sanitized = re.sub(r'\s+', '_', sanitized)
-    max_len = 200
-    if len(sanitized) > max_len:
-        cut_point = sanitized[:max_len].rfind('_')
-        if cut_point != -1:
-            sanitized = sanitized[:cut_point]
-        else:
-            sanitized = sanitized[:max_len]
+        Args:
+            filename (str): The original filename that may contain invalid characters
+            
+        Returns:
+            str: A sanitized filename that is safe to use on all major operating systems
+            
+        This function:
+        1. Removes invalid characters (<>:"/\|?*)
+        2. Replaces ampersands with 'and'
+        3. Replaces spaces with underscores
+        4. Truncates to a reasonable maximum length (200 chars)
+        5. Returns 'untitled_video' if the result is empty
+        """
+        sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+        sanitized = sanitized.replace('&', 'and')
+        sanitized = sanitized.strip()
+        sanitized = re.sub(r'\s+', '_', sanitized)
+        max_len = 200
+        if len(sanitized) > max_len:
+            cut_point = sanitized[:max_len].rfind('_')
+            if cut_point != -1:
+                sanitized = sanitized[:cut_point]
+            else:
+                sanitized = sanitized[:max_len]
 
-    if not sanitized:
-        return "untitled_video"
-    return sanitized
+        if not sanitized:
+            return "untitled_video"
+        return sanitized
 
 
 if __name__ == "__main__":
