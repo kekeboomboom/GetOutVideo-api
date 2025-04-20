@@ -934,12 +934,12 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(progress_percent)
 
     def update_status(self, message):
-        if "extracted transcript" in message.lower() or "Saved '" in message.lower():
+        if "extracted transcript" in message.lower() or r"Saved '" in message.lower():
             color = "#27ae60"  # Green
         elif "error processing" in message.lower():
             color = "#e74c3c"  # Red
-        # elif "processing" in message.lower():
-        #     color = "#2980b9"  # Blue
+        elif "processing video" in message.lower():
+            color = "#2980b9"  # Blue
         else:
             color = "#333333"  # Dark gray
         self.status_display.append(f"<font color='{color}'>{message}</font>")
@@ -1156,7 +1156,7 @@ class TranscriptExtractionThread(QThread):
                         self.progress_update.emit(progress_percent)
                         self.status_update.emit(
                             f"Extracted transcript for video {index}/{total_videos} "
-                            f"(Original Index: {original_index}) - Title: {video_title[:50]}..."
+                            f"(Original Index: {original_index}) - Title: {video_title[:100]}..."
                         )
                     except Exception as video_error:
                         self.status_update.emit(
