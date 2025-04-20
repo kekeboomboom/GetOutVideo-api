@@ -12,7 +12,8 @@ Dependencies:
 - yt-dlp: For downloading YouTube audio (`pip install yt-dlp`)
 - pydub: For audio manipulation and segmentation (`pip install pydub`)
 - openai: Official OpenAI Python client (`pip install openai`)
-- ffmpeg: Required by pydub and yt-dlp for audio processing. Must be installed
+- ffmpeg-python: Python bindings for FFmpeg (`pip install ffmpeg-python`)
+- ffmpeg: Required by pydub, yt-dlp, and ffmpeg-python for audio processing. Must be installed
   and accessible in the system's PATH. (Download from https://ffmpeg.org/)
 
 Environment Variables:
@@ -37,6 +38,7 @@ import re, os, subprocess
 from pathlib import Path
 import yt_dlp
 from openai import OpenAI
+import ffmpeg
 
 
 # Placeholder function for AI-based Speech-to-Text
@@ -141,43 +143,54 @@ def get_transcript_with_ai_stt(video_url, video_title, transcript_file_path, cle
             print("\n--- Skipping cleanup of intermediate files ---")
 
 
-def detect_silence(audio_path, noise_thresh='-30dB', min_silence_len=0.5):
+def detect_silence(audio_path, noise_thresh='-30dB', min_silence_len=1.5):
     """
-    Detects silence segments in an audio file using ffmpeg's silence detection filter.
-    
-    This function uses ffmpeg's silencedetect filter to identify periods of silence
-    in the audio file based on specified noise threshold and minimum silence duration.
-    
+    Detects silence segments in an audio file using ffmpeg's silence detection filter
+    via the ffmpeg-python library.
+
     Args:
-        audio_path (str): Path to the audio file to analyze
-        noise_thresh (str): Noise threshold in dB for silence detection (default: '-30dB')
-        min_silence_len (float): Minimum duration in seconds for a segment to be considered silence (default: 0.5)
-        
+        audio_path (str): Path to the audio file to analyze.
+        noise_thresh (str): Noise threshold in dB for silence detection (default: '-30dB').
+        min_silence_len (float): Minimum duration in seconds for a segment to be considered silence (default: 1.5).
+
     Returns:
-        list: A list of tuples containing (start_time, end_time) for each detected silence segment
-        
-    The function:
-    1. Runs ffmpeg with silencedetect filter to analyze the audio
-    2. Parses the output to extract silence start and end times
-    3. Returns a list of silence segments as (start, end) time tuples
+        list: A list of tuples containing (start_time, end_time) for each detected silence segment.
     """
-    cmd = [
-        'ffmpeg', '-i', audio_path,
-        '-af', f'silencedetect=noise={noise_thresh}:d={min_silence_len}',
-        '-f', 'null', '-']
-
     # Set creation flags to hide console window on Windows
-    creation_flags = 0
-    if os.name == 'nt': # Check if running on Windows
-        creation_flags = subprocess.CREATE_NO_WINDOW
 
-    # Explicitly set encoding to utf-8 and handle errors
-    process = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                               text=True, encoding='utf-8', errors='ignore',
-                               creationflags=creation_flags) # Add creationflags here
-    stderr = process.stderr.read()
-    process.wait()
 
+    try:
+        # Use ffmpeg-python to build and run the command
+        # quiet=True suppresses ffmpeg's own logs but not silencedetect output to stderr
+        out, err = (
+            ffmpeg
+            .input(audio_path)
+            .filter('silencedetect', noise=noise_thresh, d=min_silence_len)
+            .output('-', format='null') # Output to null device
+            .run(capture_stdout=True, capture_stderr=True, quiet=True) # Pass kwargs for creationflags
+        )
+        # silencedetect logs to stderr
+        stderr = err.decode('utf-8', errors='ignore')
+
+    except ffmpeg.Error as e:
+        # Log the error output from ffmpeg if it fails
+        print(f"ffmpeg-python error during silence detection:")
+        # Try decoding stderr for more detailed error info
+        try:
+            print(e.stderr.decode('utf-8', errors='ignore'))
+        except Exception: # If decoding stderr itself fails
+             print("Could not decode ffmpeg stderr.")
+        return []
+    except FileNotFoundError:
+        # Handle case where ffmpeg executable is not found
+        print("Error: ffmpeg executable not found. Make sure ffmpeg is installed and in your PATH.")
+        return []
+    except Exception as e:
+        # Catch any other unexpected errors
+        print(f"An unexpected error occurred during silence detection: {e}")
+        return []
+
+    # Parse the stderr output for silence markers (same logic as before)
     pattern = r'silence_start: ([\d.]+)|silence_end: ([\d.]+)'
     events = re.findall(pattern, stderr)
 
@@ -187,8 +200,22 @@ def detect_silence(audio_path, noise_thresh='-30dB', min_silence_len=0.5):
         if start:
             current_start = float(start)
         elif end and current_start is not None:
-            silences.append((current_start, float(end)))
-            current_start = None
+            # Handle potential edge case where end time might be slightly before start time due to precision
+            end_time = float(end)
+            if end_time > current_start:
+                 silences.append((current_start, end_time))
+            else:
+                 print(f"Warning: Detected silence end time ({end_time}) not after start time ({current_start}). Skipping this interval.")
+            current_start = None # Reset regardless of whether it was added
+
+    # Handle case where audio might end during a silence detection
+    if current_start is not None:
+        # We don't have an explicit end, maybe log or decide if this needs handling
+        print(f"Warning: Silence started at {current_start} but no end detected before file end.")
+        # Option: Add it assuming it ends at audio duration? Requires getting audio duration.
+        # For now, we'll just ignore silences that don't have an end marker.
+
+
     return silences
 
 
@@ -217,27 +244,27 @@ def audio_segmentation(audio_path, output_dir):
         return []
 
     # Detect silence and get timestamps
-    silences = detect_silence(audio_path)
+    silences = detect_silence(audio_path, min_silence_len=1.5) # Using the adjusted min_silence_len
 
     # Create initial segments between silence points
     chunks = []
     last_end = 0.0
+    MIN_CHUNK_DURATION_SEC = 2.5 # Define the minimum duration threshold
     for silence_start, silence_end in silences:
         # Convert to seconds if needed (pydub uses ms)
         start_sec = silence_start
         end_sec = silence_end
         duration = start_sec - last_end
-        if duration >= 5.0:  # Skip segments shorter than 5 seconds
+        if duration >= MIN_CHUNK_DURATION_SEC:  # Use the threshold variable
             chunks.append((last_end, start_sec))
         last_end = end_sec # Use the end of the silence as the start for the next potential chunk
 
     # Add final segment if needed
     if last_end < audio.duration_seconds:
-         # Ensure the final segment isn't too short either, though this might clip the very end if it follows a silence closely.
-         # Consider if a minimum length check is needed here too.
+         # Ensure the final segment isn't too short either
         final_segment_start = last_end
         final_segment_end = audio.duration_seconds
-        if (final_segment_end - final_segment_start) >= 5.0: # Apply min duration here too?
+        if (final_segment_end - final_segment_start) >= MIN_CHUNK_DURATION_SEC: # Use the threshold variable here too
              chunks.append((final_segment_start, final_segment_end))
         # else: # Optional: handle very short final segments if needed
         #     print(f"Skipping very short final segment: {final_segment_end - final_segment_start:.2f}s")
