@@ -14,8 +14,8 @@ Whether you're a student creating study materials, a researcher processing inter
 - Check out this [Medium Article](https://medium.com/@ebrahimgolriz444/a-tool-to-turn-entire-youtube-playlists-to-markdown-formatted-and-refined-text-books-in-any-3e8742f5d0d3) from the original author for more details.
 
 <br>
-<img src="Images/POSTER.png" alt="Poster Image" height="500"/>
-<img src="Images/UI.png" alt="User Interface Image" height="500"/>
+<img src="Images/POSTER.png" alt="Poster Image" height="400"/>
+<img src="Images/UI.png" alt="User Interface Image" height="400"/>
 
 <br>
 
