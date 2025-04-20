@@ -166,9 +166,15 @@ def detect_silence(audio_path, noise_thresh='-30dB', min_silence_len=0.5):
         '-af', f'silencedetect=noise={noise_thresh}:d={min_silence_len}',
         '-f', 'null', '-']
 
+    # Set creation flags to hide console window on Windows
+    creation_flags = 0
+    if os.name == 'nt': # Check if running on Windows
+        creation_flags = subprocess.CREATE_NO_WINDOW
+
     # Explicitly set encoding to utf-8 and handle errors
-    process = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, 
-                               text=True, encoding='utf-8', errors='ignore') 
+    process = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                               text=True, encoding='utf-8', errors='ignore',
+                               creationflags=creation_flags) # Add creationflags here
     stderr = process.stderr.read()
     process.wait()
 
