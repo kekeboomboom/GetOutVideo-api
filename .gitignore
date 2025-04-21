@@ -44,3 +44,7 @@ Thumbs.db
 # Project specific
 output/
 transcripts/
+
+# YouTube Authentication
+cookie.txt
+

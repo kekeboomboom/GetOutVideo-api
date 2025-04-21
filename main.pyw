@@ -27,12 +27,12 @@ Requirements:
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QPushButton, QProgressBar, QTextEdit, QFileDialog, QMessageBox,
-                             QSlider, QGroupBox, QCheckBox, QGridLayout) 
+                             QSlider, QGroupBox, QCheckBox, QGridLayout, QComboBox) 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
 from pytubefix import Playlist, YouTube
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnplayable
 import google.generativeai as genai
 import re
 import logging
@@ -304,13 +304,30 @@ class MainWindow(QMainWindow):
 
         input_layout.addWidget(chunk_size_container)
 
-        # File Inputs
-        self.create_file_input(input_layout,
+        # --- File Inputs in Horizontal Layout ---
+        file_inputs_layout = QHBoxLayout()
+        file_inputs_layout.setSpacing(15) # Add some space between the two inputs
+
+        # Create Transcript Output File Input (will be added to file_inputs_layout)
+        transcript_widget = self.create_file_input_widget(
                                "Transcript Output File (Optional):",
                                "Choose File",
                                "transcript_file_input",
                                self.select_transcript_output_file)
+        file_inputs_layout.addWidget(transcript_widget) # Add the first widget
 
+        # Create Cookie File Input (will be added to file_inputs_layout)
+        cookie_widget = self.create_file_input_widget(
+                           "Cookie File (Optional, for AI STT):",
+                           "Choose File",
+                           "cookie_file_input",
+                           self.select_cookie_file)
+        file_inputs_layout.addWidget(cookie_widget) # Add the second widget
+
+        # Add the horizontal layout containing both file inputs to the main input layout
+        input_layout.addLayout(file_inputs_layout)
+
+        # --- Directory Input (remains below) ---
         self.create_directory_input(input_layout,
                                     "Summary Output Folder:",
                                     "Choose Folder",
@@ -400,22 +417,26 @@ class MainWindow(QMainWindow):
         self.central_widget.setLayout(main_layout)
         self.center()
 
-    def create_file_input(self, parent_layout, label_text, button_text, field_name, handler):
+    def create_file_input_widget(self, label_text, button_text, field_name, handler):
         """
-        Creates a file input component with label, text field, and button.
+        Creates a file input component widget with label, text field, and button.
         
         Args:
-            parent_layout: The layout to add this component to
             label_text (str): The label text to display above the input field
             button_text (str): The text to display on the select button
             field_name (str): The object name for the input field (for referencing later)
             handler: The function to call when the select button is clicked
             
+        Returns:
+            QWidget: A widget containing the label, input field, and button.
+            
         This creates a standardized file input UI component consisting of a label,
         a read-only text field to show the selected file path, and a button to open
-        a file selection dialog.
+        a file selection dialog, all within a containing QWidget.
         """
-        layout = QVBoxLayout()
+        container_widget = QWidget() # Create a container widget
+        layout = QVBoxLayout(container_widget) # Set layout on the container
+        layout.setContentsMargins(0,0,0,0) # Remove extra margins
         layout.setSpacing(0)
         
         font = QFont("Segoe UI", 10, QFont.Bold)
@@ -430,34 +451,26 @@ class MainWindow(QMainWindow):
         input_field = QLineEdit()
         input_field.setObjectName(field_name)
         input_field.setReadOnly(True)
-        input_field.setPlaceholderText("Optional: Select file or leave blank for default")
+        input_field.setPlaceholderText("Optional: Select file or leave blank") # Simplified placeholder
         input_field.setStyleSheet(self.get_input_style())
-
+    
         button = QPushButton(button_text)
         button.setStyleSheet(self.get_button_style("#3498db", "#2980b9"))
         button.clicked.connect(handler)
         button.setFixedWidth(120)
-
+    
         input_row.addWidget(input_field)
         input_row.addWidget(button)
         layout.addLayout(input_row)
-
-        parent_layout.addLayout(layout)
+    
+        # No longer add to parent_layout here, just set the attribute
         setattr(self, field_name, input_field)
+        return container_widget # Return the container widget
 
     def create_directory_input(self, parent_layout, label_text, button_text, field_name, handler):
         """
         Creates a directory input component with label, text field, and button.
-        
-        Args:
-            parent_layout: The layout to add this component to
-            label_text (str): The label text to display above the input field
-            button_text (str): The text to display on the select button
-            field_name (str): The object name for the input field (for referencing later)
-            handler: The function to call when the select button is clicked
-            
-        Similar to create_file_input, but specifically for selecting directories
-        rather than files.
+        Adds it directly to the parent layout.
         """
         layout = QVBoxLayout()
         layout.setSpacing(0)
@@ -470,23 +483,23 @@ class MainWindow(QMainWindow):
         
         input_row = QHBoxLayout()
         input_row.setSpacing(10)
-
+    
         input_field = QLineEdit()
         input_field.setObjectName(field_name)
         input_field.setReadOnly(True)
         input_field.setPlaceholderText(f"Select {label_text.split(':')[0].strip()} folder")
         input_field.setStyleSheet(self.get_input_style())
-
+    
         button = QPushButton(button_text)
         button.setStyleSheet(self.get_button_style("#3498db", "#2980b9"))
         button.clicked.connect(handler)
         button.setFixedWidth(140)
-
+    
         input_row.addWidget(input_field)
         input_row.addWidget(button)
         layout.addLayout(input_row)
-
-        parent_layout.addLayout(layout)
+    
+        parent_layout.addLayout(layout) # Add to parent here
         setattr(self, field_name, input_field)
 
     def get_input_style(self):
@@ -720,11 +733,12 @@ class MainWindow(QMainWindow):
         self.is_processing = processing
         self.extract_button.setEnabled(not processing)
         self.cancel_button.setEnabled(processing)
-
+    
         # Disable or enable input fields accordingly
         inputs = [
             self.url_input,
             self.transcript_file_input,
+            self.cookie_file_input,
             self.summary_output_dir_input,
             self.api_key_input,
             self.language_input,
@@ -735,12 +749,17 @@ class MainWindow(QMainWindow):
         # Also disable checkboxes
         for style_cb in self.style_checkboxes.values():
             style_cb.setEnabled(not processing)
-
+    
         for input_field in inputs:
             if isinstance(input_field, (QLineEdit, QTextEdit)):
                 input_field.setReadOnly(processing)
             else:
                 input_field.setEnabled(not processing)
+    
+        # Disable file selection buttons as well
+        for button in self.findChildren(QPushButton):
+            if button.text().startswith("Choose"):
+                button.setEnabled(not processing)
 
     def select_gemini_model(self):
         """Optional model selector; you can remove or adapt this as needed."""
@@ -749,16 +768,29 @@ class MainWindow(QMainWindow):
         msg_box.setWindowTitle("Select Gemini Model")
         msg_box.setText("Choose a Gemini model for refinement:")
 
-        # Build a minimal model selection UI in a message box
-        # If you have a more advanced UI for model selection, skip this
-        # or create a new QDialog for better user experience.
+        # Option 1: For brevity, we assume you always return the default
+        # return self.selected_model_name
+    
+        # Option 2: Build a minimal model selection UI in a message box
+        model_combo = QComboBox()
+        model_combo.addItems(self.available_models)
+        model_combo.setCurrentText(self.selected_model_name) 
 
-        # (Omitting a polished combo in the interest of clarity)
-        # Use a textual approach or build a small layout
+        layout = QVBoxLayout()
+        layout.addWidget(model_combo)
+        widget = QWidget()
+        widget.setLayout(layout)
+        msg_box.layout().addWidget(widget, 1, 0, msg_box.layout().rowCount(), 1) 
 
-        # For brevity, we assume you always return the default
-        # Or prompt user in a real combo selection. Placeholder:
-        return self.selected_model_name
+        ok_button = msg_box.addButton(QMessageBox.Ok)
+        cancel_button = msg_box.addButton(QMessageBox.Cancel)
+
+        msg_box.exec_()
+
+        if msg_box.clickedButton() == ok_button:
+            return model_combo.currentText()
+        else:
+            return None
 
     def get_selected_styles(self):
         """
@@ -798,35 +830,56 @@ class MainWindow(QMainWindow):
         if not selected_model:
             return  # If user somehow cancels model selection
         self.selected_model_name = selected_model
-
+    
         self.set_processing_state(True)
         self.progress_bar.setValue(0)
         self.status_display.clear()
-
+    
         # Determine transcript output path
         transcript_input_path = self.transcript_file_input.text().strip()
         summary_output_dir = self.summary_output_dir_input.text().strip()
-
+        cookie_file_path = self.cookie_file_input.text().strip() # Get cookie file path
+    
         if transcript_input_path:
             transcript_output = transcript_input_path
         else:
+            # Use a default name in the summary output directory if not specified
+            # Ensure the directory exists before creating the default path
+            if not os.path.exists(summary_output_dir):
+                 try:
+                     os.makedirs(summary_output_dir)
+                 except OSError as e:
+                     self.handle_error(f"Could not create output directory: {e}")
+                     self.set_processing_state(False)
+                     return
             transcript_output = os.path.join(summary_output_dir, "transcript.txt")
             self.status_display.append(
                 f"<font color='#bdc3c7'>Transcript file not specified, using default: {transcript_output}</font>"
             )
-
+    
+        # Ensure the directory for the transcript output exists
+        transcript_dir = os.path.dirname(transcript_output)
+        if transcript_dir and not os.path.exists(transcript_dir):
+            try:
+                os.makedirs(transcript_dir)
+            except OSError as e:
+                self.handle_error(f"Could not create transcript output directory: {e}")
+                self.set_processing_state(False)
+                return
+    
         self.extraction_thread = TranscriptExtractionThread(
             self.url_input.text(),
             transcript_output,
             self.start_index,
-            self.end_index
+            self.end_index,
+            cookie_path=cookie_file_path # Pass cookie path here
         )
-
+    
         self.extraction_thread.progress_update.connect(self.progress_bar.setValue)
         self.extraction_thread.status_update.connect(self.update_status)
         self.extraction_thread.extraction_complete.connect(self.start_gemini_processing)
         self.extraction_thread.error_occurred.connect(self.handle_error)
-
+    
         self.status_display.append("<font color='#3498db'>Starting transcript extraction...</font>")
         self.extraction_thread.start()
 
@@ -923,6 +976,16 @@ class MainWindow(QMainWindow):
     def select_transcript_output_file(self):
         self.select_output_file("Select Transcript Output File", self.transcript_file_input)
 
+    def select_cookie_file(self):
+        """Opens a dialog to select the cookie file."""
+        # Use getOpenFileName since the file should already exist
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Cookie File", "", "Text Files (*.txt);;All Files (*)", options=options)
+        if file_path:
+            # We don't need to force .txt here, just accept what user selects
+            self.cookie_file_input.setText(file_path)
+
     def select_summary_output_directory(self):
         options = QFileDialog.Options()
         options |= QFileDialog.ShowDirsOnly
@@ -963,7 +1026,7 @@ class TranscriptExtractionThread(QThread):
     extraction_complete = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, playlist_url, output_file, start_index=1, end_index=0):
+    def __init__(self, playlist_url, output_file, start_index=1, end_index=0, cookie_path=None):
         """
         Initializes the transcript extraction thread.
         
@@ -972,12 +1035,14 @@ class TranscriptExtractionThread(QThread):
             output_file (str): Path where transcript will be saved
             start_index (int): Starting video index (1-based) to process
             end_index (int): Ending video index to process (0 means process all)
+            cookie_path (str, optional): Path to the cookie file. Defaults to None.
         """
         super().__init__()
         self.playlist_url = playlist_url
         self.output_file = output_file
         self.start_index = start_index
         self.end_index = end_index
+        self.cookie_path = cookie_path
         self._is_running = True
 
     def run(self):
@@ -1105,13 +1170,14 @@ class TranscriptExtractionThread(QThread):
                             )
 
                         # --- Fallback to AI STT if Standard API Fails ---
-                        except (TranscriptsDisabled, NoTranscriptFound) as e:
+                        except (TranscriptsDisabled, NoTranscriptFound, VideoUnplayable) as e:
                             self.status_update.emit(
                                 f"Standard transcript unavailable for video {index}/{total_videos} ({type(e).__name__}). "
                                 f"Attempting AI STT fallback..."
                             )
                             try:
-                                transcript = get_transcript_with_ai_stt(video_url, video_title, self.output_file)
+                                # Pass the stored cookie_path here
+                                transcript = get_transcript_with_ai_stt(video_url, video_title, self.cookie_path, self.output_file) 
                                 if transcript:
                                     transcript_source = "AI STT Fallback"
                                     self.status_update.emit(
@@ -1129,8 +1195,10 @@ class TranscriptExtractionThread(QThread):
 
                         except Exception as api_general_error:
                              # Handle other youtube_transcript_api errors if needed, or re-raise
+                             exception_type = type(api_general_error).__name__
                              self.status_update.emit(
-                                 f"Error getting transcript via Standard API for video {index}/{total_videos}: {str(api_general_error)}"
+                                 f"Error getting transcript via Standard API for video {index}/{total_videos} "
+                                 f"({exception_type}): {str(api_general_error)}"
                              )
                              # Optionally, you could still try AI STT here, or just log and skip
                              transcript = None

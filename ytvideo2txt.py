@@ -39,10 +39,11 @@ from pathlib import Path
 import yt_dlp
 from openai import OpenAI
 import ffmpeg
+import sys
 
 
 # Placeholder function for AI-based Speech-to-Text
-def get_transcript_with_ai_stt(video_url, video_title, transcript_file_path, cleanup_intermediate_files=False):
+def get_transcript_with_ai_stt(video_url, video_title, cookie_path, transcript_file_path, cleanup_intermediate_files=False):
     """
     Downloads audio from a YouTube video, segments it, transcribes the segments (placeholder),
     and combines the transcripts. Optionally cleans up intermediate audio files.
@@ -50,6 +51,7 @@ def get_transcript_with_ai_stt(video_url, video_title, transcript_file_path, cle
     Args:
         video_url (str): The URL of the YouTube video.
         video_title (str): A clean title for the video, used for naming files.
+        cookie_path (str or None): Path to the cookie file for yt-dlp authentication.
         transcript_file_path (str): The desired path for the final transcript text file.
                                     The audio and chunks will be placed in its parent directory.
         cleanup_intermediate_files (bool): If True, delete the downloaded audio and chunks
@@ -61,7 +63,16 @@ def get_transcript_with_ai_stt(video_url, video_title, transcript_file_path, cle
     print(f"--- Starting transcription process for: {video_title} ---")
     
     # 1. Determine paths
-    output_dir = Path(transcript_file_path).parent
+    # Ensure transcript_file_path is a string before using Path
+    if not isinstance(transcript_file_path, str):
+        print(f"Error: transcript_file_path must be a string, got {type(transcript_file_path)}")
+        return None
+    try:
+        output_dir = Path(transcript_file_path).parent
+    except TypeError as e:
+         print(f"Error creating Path object from transcript_file_path: {e}. Value was: {transcript_file_path}")
+         return None
+
     # Sanitize video_title for use in filename (replace invalid chars)
     safe_video_title = re.sub(r'[\\/*?:"<>|]', "_", video_title) # Basic sanitization
     audio_filename = f"{safe_video_title}.m4a"
@@ -73,8 +84,8 @@ def get_transcript_with_ai_stt(video_url, video_title, transcript_file_path, cle
 
     # Use a try...finally block to ensure cleanup happens even if errors occur *after* file creation
     try:
-        # 2. Download audio
-        if not download_youtube_audio(video_url, str(audio_path)):
+        # 2. Download audio - Pass cookie_path here
+        if not download_youtube_audio(video_url, str(audio_path), cookie_path=cookie_path):
             print(f"Failed to download audio for {video_url}. Aborting.")
             return None # No files to clean up if download fails
 
@@ -83,21 +94,25 @@ def get_transcript_with_ai_stt(video_url, video_title, transcript_file_path, cle
         chunk_paths = audio_segmentation(str(audio_path), str(output_dir))
         if not chunk_paths:
             print("Audio segmentation failed or produced no chunks.")
-            return None # No files to clean up if segmentation fails
+            # Don't return immediately, allow cleanup
         else:
             print(f"Created {len(chunk_paths)} audio chunks.")
 
-        # 4. Transcribe each chunk (using OpenAI)
+        # 4. Transcribe each chunk (using OpenAI) - Only if chunks were created
         all_transcripts = []
-        print("Transcribing chunks using OpenAI gpt-4o-transcribe...")
-        for i, chunk_path in enumerate(chunk_paths):
-            print(f"Processing chunk {i+1}/{len(chunk_paths)}: {chunk_path}")
-            transcript_text = transcribe_audio_chunk_openai(chunk_path)
-            if transcript_text:
-                all_transcripts.append(transcript_text)
-            else:
-                print(f"Warning: Transcription failed for chunk {chunk_path}")
-                all_transcripts.append(f"[Transcription failed for {os.path.basename(chunk_path)}]\n")
+        if chunk_paths:
+            print("Transcribing chunks using OpenAI gpt-4o-transcribe...")
+            for i, chunk_path in enumerate(chunk_paths):
+                print(f"Processing chunk {i+1}/{len(chunk_paths)}: {chunk_path}")
+                transcript_text = transcribe_audio_chunk_openai(chunk_path)
+                if transcript_text:
+                    all_transcripts.append(transcript_text)
+                else:
+                    print(f"Warning: Transcription failed for chunk {chunk_path}")
+                    all_transcripts.append(f"[Transcription failed for {os.path.basename(chunk_path)}]\n")
+        else:
+            print("Skipping transcription as no audio chunks were created.")
+            return None # If no chunks, no transcript can be generated
 
         # 5. Combine transcripts
         full_transcript = "".join(all_transcripts)
@@ -156,8 +171,10 @@ def detect_silence(audio_path, noise_thresh='-30dB', min_silence_len=1.5):
     Returns:
         list: A list of tuples containing (start_time, end_time) for each detected silence segment.
     """
-    # Set creation flags to hide console window on Windows
-
+    # Set creation flags to hide console window only on Windows
+    creation_flags = 0
+    if sys.platform == "win32":
+        creation_flags = subprocess.CREATE_NO_WINDOW
 
     try:
         # Use ffmpeg-python to build and run the command
@@ -167,7 +184,8 @@ def detect_silence(audio_path, noise_thresh='-30dB', min_silence_len=1.5):
             .input(audio_path)
             .filter('silencedetect', noise=noise_thresh, d=min_silence_len)
             .output('-', format='null') # Output to null device
-            .run(capture_stdout=True, capture_stderr=True, quiet=True) # Pass kwargs for creationflags
+            # Pass the creationflags if on Windows
+            .run(capture_stdout=True, capture_stderr=True, quiet=True, creationflags=creation_flags)
         )
         # silencedetect logs to stderr
         stderr = err.decode('utf-8', errors='ignore')
@@ -233,71 +251,95 @@ def audio_segmentation(audio_path, output_dir):
     Output:
         Creates numbered m4a files ({base_name}_chunk_XX.m4a) in the specified output_dir.
     """
-    # Ensure output directory exists
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    # --- Start Monkey Patch to suppress ffmpeg console window ---
+    original_popen = subprocess.Popen
+    if sys.platform == "win32":
+        # Define a wrapper for Popen that adds CREATE_NO_WINDOW
+        def patched_popen(*args, **kwargs):
+            creationflags = kwargs.get('creationflags', 0)
+            # Add the flag to prevent console window
+            kwargs['creationflags'] = creationflags | subprocess.CREATE_NO_WINDOW
+            # Call the original Popen with modified kwargs
+            return original_popen(*args, **kwargs)
+        # Replace the global Popen with our patched version
+        subprocess.Popen = patched_popen
+    # --- End Monkey Patch Setup ---
 
-    # Load audio file
     try:
-        audio = AudioSegment.from_file(audio_path)
-    except Exception as e:
-        print(f"Error loading audio file {audio_path}: {e}")
-        return []
+        # Ensure output directory exists
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    # Detect silence and get timestamps
-    silences = detect_silence(audio_path, min_silence_len=1.5) # Using the adjusted min_silence_len
-
-    # Create initial segments between silence points
-    chunks = []
-    last_end = 0.0
-    MIN_CHUNK_DURATION_SEC = 2.5 # Define the minimum duration threshold
-    for silence_start, silence_end in silences:
-        # Convert to seconds if needed (pydub uses ms)
-        start_sec = silence_start
-        end_sec = silence_end
-        duration = start_sec - last_end
-        if duration >= MIN_CHUNK_DURATION_SEC:  # Use the threshold variable
-            chunks.append((last_end, start_sec))
-        last_end = end_sec # Use the end of the silence as the start for the next potential chunk
-
-    # Add final segment if needed
-    if last_end < audio.duration_seconds:
-         # Ensure the final segment isn't too short either
-        final_segment_start = last_end
-        final_segment_end = audio.duration_seconds
-        if (final_segment_end - final_segment_start) >= MIN_CHUNK_DURATION_SEC: # Use the threshold variable here too
-             chunks.append((final_segment_start, final_segment_end))
-        # else: # Optional: handle very short final segments if needed
-        #     print(f"Skipping very short final segment: {final_segment_end - final_segment_start:.2f}s")
-
-
-    # Second pass: Split segments longer than 10 minutes
-    final_chunks_times = []
-    MAX_LEN_SEC = 600  # 10 minutes in seconds
-    for start_sec, end_sec in chunks:
-        current_start = start_sec
-        while (end_sec - current_start) > MAX_LEN_SEC:
-            final_chunks_times.append((current_start, current_start + MAX_LEN_SEC))
-            current_start += MAX_LEN_SEC
-        # Add the remaining part of the chunk (or the whole chunk if it was shorter than MAX_LEN_SEC)
-        if end_sec > current_start: # Ensure there's actually a remaining part
-             final_chunks_times.append((current_start, end_sec))
-
-
-    # Export each segment as m4a file and collect paths
-    chunk_paths = []
-    audio_base_name = Path(audio_path).stem # Get filename without extension
-    for i, (start_sec, end_sec) in enumerate(final_chunks_times):
-        segment = audio[start_sec * 1000:end_sec * 1000] # pydub uses milliseconds
-        chunk_filename = f"{audio_base_name}_chunk_{i+1:02d}.m4a"
-        chunk_output_path = os.path.join(output_dir, chunk_filename)
+        # Load audio file (pydub uses ffmpeg here)
         try:
-            segment.export(chunk_output_path, format="ipod") # ipod corresponds to m4a/aac
-            chunk_paths.append(chunk_output_path)
-            print(f"Exported chunk: {chunk_output_path}")
+            audio = AudioSegment.from_file(audio_path)
         except Exception as e:
-            print(f"Error exporting chunk {chunk_output_path}: {e}")
+            print(f"Error loading audio file {audio_path}: {e}")
+            return [] # Exit early if loading fails
 
-    return chunk_paths
+        # Detect silence and get timestamps
+        # Note: detect_silence already has its own suppression logic
+        silences = detect_silence(audio_path, min_silence_len=1.5) 
+
+        # Create initial segments between silence points
+        chunks = []
+        last_end = 0.0
+        MIN_CHUNK_DURATION_SEC = 2.5 # Define the minimum duration threshold
+        for silence_start, silence_end in silences:
+            # Convert to seconds if needed (pydub uses ms)
+            start_sec = silence_start
+            end_sec = silence_end
+            duration = start_sec - last_end
+            if duration >= MIN_CHUNK_DURATION_SEC:  # Use the threshold variable
+                chunks.append((last_end, start_sec))
+            last_end = end_sec # Use the end of the silence as the start for the next potential chunk
+
+        # Add final segment if needed
+        if last_end < audio.duration_seconds:
+            # Ensure the final segment isn't too short either
+            final_segment_start = last_end
+            final_segment_end = audio.duration_seconds
+            if (final_segment_end - final_segment_start) >= MIN_CHUNK_DURATION_SEC: # Use the threshold variable here too
+                chunks.append((final_segment_start, final_segment_end))
+            # else: # Optional: handle very short final segments if needed
+            #     print(f"Skipping very short final segment: {final_segment_end - final_segment_start:.2f}s")
+
+
+        # Second pass: Split segments longer than 10 minutes
+        final_chunks_times = []
+        MAX_LEN_SEC = 600  # 10 minutes in seconds
+        for start_sec, end_sec in chunks:
+            current_start = start_sec
+            while (end_sec - current_start) > MAX_LEN_SEC:
+                final_chunks_times.append((current_start, current_start + MAX_LEN_SEC))
+                current_start += MAX_LEN_SEC
+            # Add the remaining part of the chunk (or the whole chunk if it was shorter than MAX_LEN_SEC)
+            if end_sec > current_start: # Ensure there's actually a remaining part
+                final_chunks_times.append((current_start, end_sec))
+
+
+        # Export each segment as m4a file and collect paths
+        chunk_paths = []
+        audio_base_name = Path(audio_path).stem # Get filename without extension
+        for i, (start_sec, end_sec) in enumerate(final_chunks_times):
+            segment = audio[start_sec * 1000:end_sec * 1000] # pydub uses milliseconds
+            chunk_filename = f"{audio_base_name}_chunk_{i+1:02d}.m4a"
+            chunk_output_path = os.path.join(output_dir, chunk_filename)
+            try:
+                # pydub uses ffmpeg here for exporting
+                segment.export(chunk_output_path, format="ipod") # ipod corresponds to m4a/aac
+                chunk_paths.append(chunk_output_path)
+                print(f"Exported chunk: {chunk_output_path}")
+            except Exception as e:
+                print(f"Error exporting chunk {chunk_output_path}: {e}")
+
+        return chunk_paths # Return the paths list
+
+    finally:
+        # --- Restore original Popen ---
+        # Crucial to restore the original function to avoid affecting other parts of the script
+        # or other libraries unexpectedly.
+        subprocess.Popen = original_popen
+        # --- End Restore ---
 
 def transcribe_audio_chunk_openai(audio_chunk_path):
     """
@@ -330,7 +372,7 @@ def transcribe_audio_chunk_openai(audio_chunk_path):
         print(f"Exception during transcription: {e}")
         return None
 
-def download_youtube_audio(video_url, output_path):
+def download_youtube_audio(video_url, output_path, cookie_path=None):
     """
     Downloads the audio track from a YouTube video URL as an M4A file.
 
@@ -338,6 +380,7 @@ def download_youtube_audio(video_url, output_path):
         video_url (str): The URL of the YouTube video.
         output_path (str): The full path (including filename and .m4a extension)
                            where the audio will be saved.
+        cookie_path (str, optional): Path to the cookie file to use for authentication. Defaults to None.
 
     Returns:
         bool: True if download was successful, False otherwise.
@@ -364,6 +407,13 @@ def download_youtube_audio(video_url, output_path):
         'noprogress': False, # Set to True to disable progress bar
         'noplaylist': True, # Ensure only single video is downloaded if URL points to playlist item
     }
+
+    # Conditionally add the cookie file option if the path is provided and exists
+    if cookie_path and os.path.exists(cookie_path):
+        ydl_opts['cookiefile'] = cookie_path
+        print(f"Using cookie file: {cookie_path}")
+    elif cookie_path:
+        print(f"Warning: Cookie file specified but not found at {cookie_path}. Proceeding without cookies.")
 
     print(f"Attempting to download audio from: {video_url}")
     print(f"Saving to: {output_path}") # The final path after conversion
@@ -393,6 +443,9 @@ def download_youtube_audio(video_url, output_path):
                 
     except yt_dlp.utils.DownloadError as e:
         print(f"Error downloading audio: {e}")
+        # Check if the error message indicates an authentication issue
+        if 'Authentication required' in str(e) or 'sign in' in str(e).lower():
+             print("Authentication error. If this is a private or age-restricted video, try providing a valid cookie file.")
         return False
     except Exception as e:
         print(f"An unexpected error occurred during download: {e}")
@@ -402,6 +455,9 @@ def download_youtube_audio(video_url, output_path):
 if __name__ == "__main__":
     test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ" # Example URL
     test_title = "Rick Astley - Never Gonna Give You Up (Official Music Video)"
+    # Example cookie file path (replace with your actual path if testing)
+    test_cookie_path = "cookie.txt" # Assumes cookie.txt is in the same directory
+
     # Create a subdirectory for output in the script's location
     script_dir = Path(__file__).parent
     output_subdir = script_dir / "output_transcripts"
@@ -423,6 +479,7 @@ if __name__ == "__main__":
     result_transcript = get_transcript_with_ai_stt(
         test_url, 
         test_title, 
+        test_cookie_path, # Pass the cookie path here
         str(final_transcript_path), 
         cleanup_intermediate_files=PERFORM_CLEANUP 
     )
