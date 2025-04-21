@@ -30,6 +30,7 @@ Whether you're a student creating study materials, a researcher processing inter
 - 🖥️ User-friendly UI with intuitive controls and progress updates
 - 🧠 AI-powered text refinement using Gemini models (Select between 2.5 Pro and Flash)
 - 🎙️ High-quality audio transcription using OpenAI's gpt-4o-transcribe
+- 🍪 **Cookie Support**: Optionally provide a browser cookie file to access member-only or login-required videos during AI transcription fallback.
 - 📁 Configurable output file paths
 - ⏳ Progress tracking for both extraction and refinement
 - 📄 Output to formatted markdown files, one per video **per selected style**
@@ -89,6 +90,10 @@ We've added the capability to transcribe YouTube videos using OpenAI's powerful 
 >> - Audio is automatically downloaded, intelligently segmented based on silence detection, and transcribed
 >> - Handles videos in multiple languages with excellent accuracy
 >> - Perfect for videos without available captions or when higher quality transcription is needed
+
+>> 🔐 **Access Restricted Content (Optional)**
+>> - By providing a `cookie.txt` file exported from your web browser (while logged into YouTube), the audio downloader (`yt-dlp`) can attempt to access videos that require login, such as **member-only content** or some **age-restricted videos**.
+>> - This enhances the ability to transcribe a wider range of content when the standard transcript API fails.
 
 >> 🔊 **Intelligent Audio Processing**
 >> - Automatically segments audio based on natural speech pauses using silence detection
@@ -164,7 +169,8 @@ pip install -r requirements.txt
    - Adjust the **Chunk Size** slider if needed.
    - (Optional) Set **Start** and **End** video indices for partial playlist processing.
    - Choose an **output folder** for the refined `.md` files.
-   - (Optional) set a custom transcript output file if desired.
+   - (Optional) Set a custom transcript output file if desired.
+   - (Optional) Provide the path to your browser's `cookie.txt` file via the **Cookie File** input. This is used by the AI STT fallback to potentially access member-only or login-required videos. *Export the cookie file in the Netscape format.*
    - Enter your **Gemini API key**.
    - Click **Start Processing** and watch progress in the status area.
 
