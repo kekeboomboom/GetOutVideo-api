@@ -25,6 +25,15 @@ class AIProcessor:
     using various processing styles and handling large transcripts through chunking.
     """
     
+    # Gemini pricing per 1K tokens (as of current rates)
+    # These are approximate rates and should be updated based on current Google pricing
+    GEMINI_PRICING = {
+        "gemini-1.5-flash": {"input": 0.000075, "output": 0.0003},  # per 1K tokens
+        "gemini-1.5-pro": {"input": 0.00125, "output": 0.005},     # per 1K tokens
+        "gemini-1.0-pro": {"input": 0.0005, "output": 0.0015},     # per 1K tokens
+        "gemini-2.5-flash": {"input": 0.000075, "output": 0.0003}, # per 1K tokens (same as 1.5-flash)
+    }
+    
     def __init__(self, config: APIConfig):
         """
         Initialize the AI processor.
@@ -41,6 +50,23 @@ class AIProcessor:
     def cancel(self) -> None:
         """Cancel the current processing operation."""
         self._cancelled = True
+    
+    def _calculate_gemini_cost(self, input_tokens: int, output_tokens: int, model_name: str) -> float:
+        """
+        Calculate the cost of Gemini API usage.
+        
+        Args:
+            input_tokens: Number of input tokens
+            output_tokens: Number of output tokens  
+            model_name: Name of the Gemini model used
+            
+        Returns:
+            float: Cost in USD
+        """
+        pricing = self.GEMINI_PRICING.get(model_name, self.GEMINI_PRICING.get("gemini-1.5-flash"))
+        input_cost = (input_tokens / 1000) * pricing["input"]
+        output_cost = (output_tokens / 1000) * pricing["output"]
+        return input_cost + output_cost
     
     def process_transcripts(self,
                           transcripts: List[VideoTranscript],
@@ -186,6 +212,8 @@ class AIProcessor:
         try:
             style_prompt = get_prompt_for_style(style_name)
             full_response = ""
+            total_input_tokens = 0
+            total_output_tokens = 0
             
             # Process each chunk
             for chunk_index, chunk in enumerate(chunks):
@@ -206,6 +234,15 @@ class AIProcessor:
                     response = model.generate_content(full_prompt)
                     full_response += response.text + "\n\n"
                     
+                    # Track token usage if available
+                    if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                        total_input_tokens += response.usage_metadata.prompt_token_count or 0
+                        total_output_tokens += response.usage_metadata.candidates_token_count or 0
+                        safe_status_callback(status_callback,
+                                           f"Chunk {chunk_index + 1}/{len(chunks)} tokens: "
+                                           f"input={response.usage_metadata.prompt_token_count}, "
+                                           f"output={response.usage_metadata.candidates_token_count}")
+                    
                     safe_status_callback(status_callback,
                                        f"Chunk {chunk_index + 1}/{len(chunks)} processed for style '{style_name}'.")
                     
@@ -225,15 +262,25 @@ class AIProcessor:
                     f.write(f"**Original Video URL:** {transcript.url}\n\n")
                     f.write(full_response.strip())
                 
+                # Calculate cost
+                gemini_cost = self._calculate_gemini_cost(total_input_tokens, total_output_tokens, 
+                                                        self.config.processing_config.model_name)
+                
                 safe_status_callback(status_callback,
                                    f"Saved '{style_name}' output for video {video_index} to {output_path}")
+                safe_status_callback(status_callback,
+                                   f"Gemini usage - Input tokens: {total_input_tokens}, "
+                                   f"Output tokens: {total_output_tokens}, Cost: ${gemini_cost:.6f}")
                 
                 return ProcessingResult(
                     video_transcript=transcript,
                     style_name=style_name,
                     output_file_path=output_path,
                     processing_time=0.0,  # Will be set by caller
-                    chunk_count=len(chunks)
+                    chunk_count=len(chunks),
+                    gemini_input_tokens=total_input_tokens,
+                    gemini_output_tokens=total_output_tokens,
+                    gemini_cost=gemini_cost
                 )
                 
             except IOError as e:

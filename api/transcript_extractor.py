@@ -31,6 +31,9 @@ class TranscriptExtractor:
     supporting both individual videos and playlists with range selection.
     """
     
+    # OpenAI Whisper pricing (as of current rates)
+    WHISPER_COST_PER_MINUTE = 0.006  # $0.006 per minute
+    
     def __init__(self, config: APIConfig):
         """
         Initialize the transcript extractor.
@@ -211,6 +214,8 @@ class TranscriptExtractor:
         video_title = f"Video_{original_index}"
         transcript_text = None
         transcript_source = "Unknown"
+        audio_duration_minutes = 0.0
+        openai_cost = 0.0
         
         try:
             # Get video title
@@ -258,17 +263,21 @@ class TranscriptExtractor:
                     try:
                         print(f"DEBUG: Attempting AI STT fallback...")
                         # Use the AI STT fallback
-                        transcript_text = ytvideo2txt.get_transcript_with_ai_stt(
+                        result = ytvideo2txt.get_transcript_with_ai_stt(
                             video_url, video_title, self.config.transcript_config.cookie_path, 
                             None,  # We don't need transcript_file_path for API usage
                             self.config.transcript_config.cleanup_temp_files
                         )
                         
-                        if transcript_text:
+                        if result and result[0]:  # Check if we got a tuple with transcript
+                            transcript_text, audio_duration_minutes = result
                             transcript_source = "ai_stt"
+                            openai_cost = audio_duration_minutes * self.WHISPER_COST_PER_MINUTE
                             print(f"DEBUG: AI STT fallback successful, length: {len(transcript_text)}")
+                            print(f"DEBUG: Audio duration: {audio_duration_minutes:.2f} min, Cost: ${openai_cost:.4f}")
                             safe_status_callback(status_callback,
-                                               f"Successfully obtained transcript via AI STT for video {current_index}/{total_videos}.")
+                                               f"Successfully obtained transcript via AI STT for video {current_index}/{total_videos}. "
+                                               f"Duration: {audio_duration_minutes:.2f} min, Cost: ${openai_cost:.4f}")
                         else:
                             print(f"DEBUG: AI STT fallback returned no transcript")
                             safe_status_callback(status_callback,
@@ -302,7 +311,9 @@ class TranscriptExtractor:
                     title=video_title,
                     url=video_url,
                     transcript_text=transcript_text,
-                    source=transcript_source
+                    source=transcript_source,
+                    audio_duration_minutes=audio_duration_minutes,
+                    openai_cost=openai_cost
                 )
             else:
                 print(f"DEBUG: No transcript text obtained, returning None")

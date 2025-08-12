@@ -119,21 +119,43 @@ def example_4_two_step_process():
     
     # Step 1: Extract transcripts only
     transcripts = extract_transcripts_only(
-        url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        url="https://www.youtube.com/watch?v=7gp7GkPE-tI&feature=youtu.be",
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
         openai_api_key=os.getenv("OPENAI_API_KEY")
     )
     
     print(f"Extracted {len(transcripts)} transcripts:")
-    for transcript in transcripts:
-        print(f"  - {transcript.title} ({len(transcript.transcript_text)} chars)")
-        print(f"    Source: {transcript.source}")
-        print(f"    Word count: {transcript.word_count}")
+    
+    # Save transcripts to file
+    transcript_output_file = "./output/two_step_example/extracted_transcripts.txt"
+    os.makedirs(os.path.dirname(transcript_output_file), exist_ok=True)
+    
+    with open(transcript_output_file, 'w', encoding='utf-8') as f:
+        f.write("Extracted Transcripts\n")
+        f.write("=" * 50 + "\n\n")
+        
+        for transcript in transcripts:
+            print(f"  - {transcript.title} ({len(transcript.transcript_text)} chars)")
+            print(f"    Source: {transcript.source}")
+            print(f"    Word count: {transcript.word_count}")
+            
+            # Write to file
+            f.write(f"Title: {transcript.title}\n")
+            f.write(f"Source: {transcript.source}\n")
+            f.write(f"Word count: {transcript.word_count}\n")
+            f.write(f"Character count: {len(transcript.transcript_text)}\n")
+            f.write("-" * 50 + "\n")
+            f.write(transcript.transcript_text)
+            f.write("\n" + "=" * 50 + "\n\n")
+    
+    print(f"Transcripts saved to: {transcript_output_file}")
     
     # Step 2: Process with AI (could be done later, with different settings)
     api = WatchYTPL4MeAPI(
         gemini_api_key=os.getenv("GEMINI_API_KEY")
     )
+    
+    print(f"Using Gemini model: {api.config.processing_config.model_name}")
     
     results = api.process_with_ai(
         transcripts=transcripts,
@@ -141,10 +163,32 @@ def example_4_two_step_process():
     )
     
     print(f"\nGenerated {len(results)} processed files:")
+    
+    # Calculate total costs
+    total_openai_cost = sum(transcript.openai_cost or 0.0 for transcript in transcripts)
+    total_gemini_cost = sum(result.gemini_cost or 0.0 for result in results)
+    total_cost = total_openai_cost + total_gemini_cost
+    
+    print(f"\n=== TOKEN COSTS SUMMARY ===")
+    print(f"OpenAI (Whisper STT): ${total_openai_cost:.6f}")
+    print(f"Gemini Processing: ${total_gemini_cost:.6f}")
+    print(f"Total Cost: ${total_cost:.6f}")
+    
+    print(f"\n=== DETAILED BREAKDOWN ===")
+    for transcript in transcripts:
+        if transcript.openai_cost and transcript.openai_cost > 0:
+            print(f"\nTranscript: {transcript.title[:50]}...")
+            print(f"  OpenAI STT Cost: ${transcript.openai_cost:.6f} ({transcript.audio_duration_minutes:.2f} minutes)")
+    
     for result in results:
-        print(f"  - {result.output_file_path}")
-        print(f"    Style: {result.style_name}")
-        print(f"    Processing time: {result.processing_time:.2f}s")
+        print(f"\nProcessed File: {result.output_file_path}")
+        print(f"  Style: {result.style_name}")
+        print(f"  Processing time: {result.processing_time:.2f}s")
+        if result.gemini_cost and result.gemini_cost > 0:
+            print(f"  Gemini Tokens - Input: {result.gemini_input_tokens}, Output: {result.gemini_output_tokens}")
+            print(f"  Gemini Cost: ${result.gemini_cost:.6f}")
+        else:
+            print(f"  Gemini Cost: $0.000000 (no token data available)")
 
 
 def example_5_error_handling():
@@ -267,9 +311,9 @@ def main():
     # Run examples with error handling
     examples = [
         # example_1_simple_usage,
-        example_2_single_video,
+        # example_2_single_video,
         # example_3_advanced_configuration,
-        # example_4_two_step_process,
+        example_4_two_step_process,
         # example_5_error_handling,
         # example_6_environment_config,
         # example_7_progress_callbacks

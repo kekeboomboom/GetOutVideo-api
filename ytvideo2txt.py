@@ -58,7 +58,8 @@ def get_transcript_with_ai_stt(video_url, video_title, cookie_path, transcript_f
                                            after processing. Defaults to False.
 
     Returns:
-        str or None: The combined transcript text if successful, otherwise None.
+        tuple: (combined_transcript_text, duration_in_minutes) if successful, 
+               (None, None) if failed.
     """
     print(f"--- Starting transcription process for: {video_title} ---")
     
@@ -78,6 +79,7 @@ def get_transcript_with_ai_stt(video_url, video_title, cookie_path, transcript_f
     audio_filename = f"{safe_video_title}.m4a"
     audio_path = output_dir / audio_filename
     chunk_paths = [] # Initialize chunk_paths in case segmentation fails
+    audio_duration_minutes = 0.0
 
     print(f"Output directory: {output_dir}")
     print(f"Target audio path: {audio_path}")
@@ -87,7 +89,15 @@ def get_transcript_with_ai_stt(video_url, video_title, cookie_path, transcript_f
         # 2. Download audio - Pass cookie_path here
         if not download_youtube_audio(video_url, str(audio_path), cookie_path=cookie_path):
             print(f"Failed to download audio for {video_url}. Aborting.")
-            return None # No files to clean up if download fails
+            return None, None # No files to clean up if download fails
+
+        # Get audio duration for cost calculation
+        try:
+            audio = AudioSegment.from_file(str(audio_path))
+            audio_duration_minutes = len(audio) / 1000 / 60  # Convert ms to minutes
+            print(f"Audio duration: {audio_duration_minutes:.2f} minutes")
+        except Exception as e:
+            print(f"Warning: Could not get audio duration: {e}")
 
         # 3. Segment audio
         print(f"Segmenting audio file: {audio_path}")
@@ -112,14 +122,14 @@ def get_transcript_with_ai_stt(video_url, video_title, cookie_path, transcript_f
                     all_transcripts.append(f"[Transcription failed for {os.path.basename(chunk_path)}]\n")
         else:
             print("Skipping transcription as no audio chunks were created.")
-            return None # If no chunks, no transcript can be generated
+            return None, None # If no chunks, no transcript can be generated
 
         # 5. Combine transcripts
         full_transcript = "".join(all_transcripts)
         print("--- Transcription process finished ---")
 
-        # 7. Return combined transcript
-        return full_transcript
+        # 7. Return combined transcript and duration
+        return full_transcript, audio_duration_minutes
 
     finally:
         # 6. Optional: Clean up intermediate files (original audio and chunks)

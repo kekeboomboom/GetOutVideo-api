@@ -35,7 +35,7 @@ class ProcessingConfig:
     """Configuration for AI processing."""
     
     chunk_size: int = 70000
-    model_name: str = "gemini-1.5-flash"
+    model_name: str = "gemini-2.5-flash"
     output_language: str = "English"
     styles: Optional[List[str]] = None  # Uses all styles by default
     
