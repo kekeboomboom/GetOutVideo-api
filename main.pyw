@@ -1162,8 +1162,8 @@ class TranscriptExtractionThread(QThread):
                                 f"Attempting standard transcript extraction for video {index}/{total_videos} "
                                 f"(Original Index: {original_index}) - Title: {video_title[:50]}..."
                             )
-                            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-                            transcript = ' '.join([t['text'] for t in transcript_list])
+                            fetched_transcript = YouTubeTranscriptApi().fetch(video_id)
+                            transcript = ' '.join([t['text'] for t in fetched_transcript])
                             transcript_source = "Standard API"
                             self.status_update.emit(
                                 f"Successfully extracted transcript via Standard API for video {index}/{total_videos}."
