@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**WatchYTPL4Me** is a YouTube playlist to text transformation tool that converts video content into professional-quality documents. It extracts transcripts from YouTube videos/playlists and uses AI (Gemini API) to refine them into various formatted styles.
+**WatchYTPL4Me** is a YouTube playlist to text transformation tool that converts video content into professional-quality documents. It extracts transcripts from YouTube videos/playlists and uses AI (GPT-5 API) to refine them into various formatted styles.
 
 ### Core Architecture
 
@@ -12,7 +12,7 @@ The application follows a multi-threaded PyQt5 GUI architecture:
 
 1. **Main Application** (`main.pyw`): PyQt5 GUI with user controls and progress tracking
 2. **Transcript Extraction Thread** (`main.pyw:1007-1259`): Downloads and extracts video transcripts  
-3. **Gemini Processing Thread** (`main.pyw:1261-1522`): Processes transcripts using Gemini API
+3. **GPT-5 Processing Thread** (`main.pyw:1261-1522`): Processes transcripts using GPT-5 API
 4. **Audio Transcription Module** (`ytvideo2txt.py`): Fallback AI STT using OpenAI's gpt-4o-transcribe
 5. **Prompt Templates** (`prompts.py`): Defines refinement styles and prompts
 
@@ -22,7 +22,7 @@ The application follows a multi-threaded PyQt5 GUI architecture:
 2. **Transcript Extraction**: 
    - Primary: YouTube Transcript API via `youtube_transcript_api`
    - Fallback: Audio download → segmentation → OpenAI STT transcription
-3. **Text Refinement**: Gemini API processes transcript chunks with style-specific prompts
+3. **Text Refinement**: GPT-5 API processes transcript chunks with style-specific prompts
 4. **Output Generation**: Creates markdown files for each video × style combination
 
 ## Common Commands
@@ -46,7 +46,6 @@ pip install -r requirements.txt
 ### Environment Setup
 Create a `.env` file with:
 ```
-GEMINI_API_KEY=your_gemini_key_here
 OPENAI_API_KEY=your_openai_key_here
 LANGUAGE=English
 ```
@@ -69,7 +68,7 @@ python ytvideo2txt.py
 - Invalid filename characters are removed/replaced
 
 ### API Integration
-- **Gemini API**: Uses `google-generativeai` library, configurable model selection
+- **GPT-5 API**: Uses official `openai` client for text processing and transcription
 - **OpenAI API**: Uses official `openai` client for audio transcription
 - **YouTube API**: Uses `youtube_transcript_api` and `pytubefix` for video access
 
@@ -88,8 +87,7 @@ python ytvideo2txt.py
 - `PyQt5`: GUI framework
 - `pytubefix`: YouTube video access (preferred over pytube)
 - `youtube-transcript-api`: Transcript extraction
-- `google-generativeai`: Gemini API integration
-- `openai`: Audio transcription fallback
+- `openai`: GPT-5 API integration and audio transcription fallback
 - `yt-dlp`: Audio downloading
 - `pydub`: Audio processing and segmentation
 - `ffmpeg-python`: Audio manipulation

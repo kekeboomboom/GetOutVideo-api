@@ -29,6 +29,7 @@ from .transcript_extractor import TranscriptExtractor
 from .ai_processor import AIProcessor
 from .prompts import get_available_styles
 from .exceptions import WatchYTPLError, ConfigurationError, TranscriptExtractionError, AIProcessingError
+from . import config_urls
 
 # Version info
 __version__ = "1.0.0"
@@ -43,17 +44,17 @@ class WatchYTPL4MeAPI:
     workflows, providing a clean interface for programmatic use.
     """
     
-    def __init__(self, gemini_api_key: str, openai_api_key: Optional[str] = None):
+    def __init__(self, openai_api_key: str, gemini_api_key: Optional[str] = None):
         """
         Initialize the API with required credentials.
         
         Args:
-            gemini_api_key: Google Gemini API key for text processing
-            openai_api_key: Optional OpenAI API key for audio transcription fallback
+            openai_api_key: OpenAI API key for text processing
+            gemini_api_key: Optional Gemini API key for backward compatibility
         """
         self.config = APIConfig(
-            gemini_api_key=gemini_api_key,
-            openai_api_key=openai_api_key
+            openai_api_key=openai_api_key,
+            gemini_api_key=gemini_api_key
         )
         
         self.transcript_extractor = TranscriptExtractor(self.config)
@@ -199,9 +200,9 @@ class WatchYTPL4MeAPI:
 
 def process_youtube_playlist(url: str,
                            output_dir: str,
-                           gemini_api_key: str,
+                           openai_api_key: str,
                            styles: Optional[List[str]] = None,
-                           openai_api_key: Optional[str] = None,
+                           gemini_api_key: Optional[str] = None,
                            start_index: int = 1,
                            end_index: int = 0,
                            output_language: str = "English",
@@ -215,9 +216,9 @@ def process_youtube_playlist(url: str,
     Args:
         url: YouTube playlist or video URL
         output_dir: Directory where processed files will be saved
-        gemini_api_key: Google Gemini API key
+        openai_api_key: OpenAI API key for text processing
         styles: List of processing styles (None = all styles)
-        openai_api_key: Optional OpenAI API key for audio fallback
+        gemini_api_key: Optional Gemini API key for backward compatibility
         start_index: Starting video index for playlists (1-based)
         end_index: Ending video index for playlists (0 = process all)
         output_language: Target language for the output
@@ -231,13 +232,13 @@ def process_youtube_playlist(url: str,
     """
     print(f"DEBUG: process_youtube_playlist called with:")
     print(f"  URL: {url}")
-    print(f"  Gemini API key: {'SET' if gemini_api_key else 'NOT SET'}")
     print(f"  OpenAI API key: {'SET' if openai_api_key else 'NOT SET'}")
+    print(f"  Gemini API key: {'SET' if gemini_api_key else 'NOT SET'}")
     print(f"  Styles: {styles}")
     print(f"  Use AI fallback: {use_ai_fallback}")
     
     print(f"DEBUG: Creating WatchYTPL4MeAPI instance...")
-    api = WatchYTPL4MeAPI(gemini_api_key, openai_api_key)
+    api = WatchYTPL4MeAPI(openai_api_key, gemini_api_key)
     
     # Enable AI fallback if requested and OpenAI key is available
     if use_ai_fallback and openai_api_key:
@@ -258,8 +259,8 @@ def process_youtube_playlist(url: str,
 
 
 def extract_transcripts_only(url: str,
-                           gemini_api_key: str,
-                           openai_api_key: Optional[str] = None,
+                           openai_api_key: str,
+                           gemini_api_key: Optional[str] = None,
                            start_index: int = 1,
                            end_index: int = 0,
                            use_ai_fallback: bool = True) -> List[VideoTranscript]:
@@ -268,8 +269,8 @@ def extract_transcripts_only(url: str,
     
     Args:
         url: YouTube playlist or video URL
-        gemini_api_key: Google Gemini API key (required for API initialization)
-        openai_api_key: Optional OpenAI API key for audio fallback
+        openai_api_key: OpenAI API key (required for API initialization)
+        gemini_api_key: Optional Gemini API key for backward compatibility
         start_index: Starting video index for playlists (1-based)
         end_index: Ending video index for playlists (0 = process all)
         use_ai_fallback: Whether to use AI STT when YouTube transcripts unavailable
@@ -286,7 +287,7 @@ def extract_transcripts_only(url: str,
         use_ai_fallback=use_ai_fallback
     )
     
-    api = WatchYTPL4MeAPI(gemini_api_key, openai_api_key)
+    api = WatchYTPL4MeAPI(openai_api_key, gemini_api_key)
     return api.extract_transcripts(url, config)
 
 
@@ -294,7 +295,7 @@ def load_api_from_env() -> WatchYTPL4MeAPI:
     """
     Load API configuration from environment variables.
     
-    Expects GEMINI_API_KEY and optionally OPENAI_API_KEY and LANGUAGE
+    Expects OPENAI_API_KEY and optionally GEMINI_API_KEY and LANGUAGE
     environment variables.
     
     Returns:
@@ -305,7 +306,7 @@ def load_api_from_env() -> WatchYTPL4MeAPI:
     """
     try:
         config = load_config_from_env()
-        api = WatchYTPL4MeAPI(config.gemini_api_key, config.openai_api_key)
+        api = WatchYTPL4MeAPI(config.openai_api_key, config.gemini_api_key)
         api.config = config  # Use the full config with language settings
         return api
     except Exception as e:

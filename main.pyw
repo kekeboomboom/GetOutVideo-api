@@ -2,7 +2,7 @@
 YouTube Playlist to Formatted Text (WatchYTPL4Me)
 
 This application extracts transcripts from YouTube playlists or individual videos
-and processes them using the Google Gemini API to create well-formatted, readable
+and processes them using the OpenAI GPT-5 API to create well-formatted, readable
 markdown documents.
 
 Main features:
@@ -15,13 +15,13 @@ Main features:
 
 The application uses a multi-threaded approach to maintain UI responsiveness:
 1. TranscriptExtractionThread: Extracts video transcripts from YouTube
-2. GeminiProcessingThread: Processes transcripts with the Gemini API
+2. GPT5ProcessingThread: Processes transcripts with the GPT-5 API
 
 Requirements:
 - PyQt5 for the user interface
 - pytubefix for accessing YouTube data
 - youtube_transcript_api for extracting transcripts
-- google.generativeai for text processing
+- openai for text processing
 """
 
 import sys
@@ -33,7 +33,7 @@ from PyQt5.QtGui import QFont, QColor
 from datetime import datetime
 from pytubefix import Playlist, YouTube
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnplayable
-import google.generativeai as genai
+import openai
 import re
 import logging
 import os
@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
     - View progress and status updates during processing
     
     The application extracts video transcripts from YouTube and processes them
-    using the Gemini API to create formatted and refined output documents.
+    using the GPT-5 API to create formatted and refined output documents.
     """
     
     DEFAULT_CHUNK_SIZE = 70000  # Define default chunk size as a class variable
@@ -67,14 +67,14 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.prompts = text_refinement_prompts
         self.extraction_thread = None
-        self.gemini_thread = None
+        self.gpt5_thread = None
         self.is_processing = False
 
-        self.available_models = ["gemini-2.5-flash-preview-04-17", "gemini-2.5-pro-preview-03-25"]
-        self.selected_model_name = "gemini-2.5-flash-preview-04-17"
+        self.available_models = ["gpt-5", "gpt-4-turbo", "gpt-4o", "gpt-4o-mini"]
+        self.selected_model_name = "gpt-5"
 
         # Set the class variable default chunk size using the constant
-        GeminiProcessingThread.chunk_size = self.DEFAULT_CHUNK_SIZE
+        GPT5ProcessingThread.chunk_size = self.DEFAULT_CHUNK_SIZE
 
         self.initUI()
 
@@ -295,7 +295,7 @@ class MainWindow(QMainWindow):
 
         # Description
         chunk_size_description = QLabel(
-            f"(Maximum words per Gemini API call. Default: {self.DEFAULT_CHUNK_SIZE}, approx. 1/10 of 1M tokens context window)"
+            f"(Maximum words per GPT-5 API call. Default: {self.DEFAULT_CHUNK_SIZE}, optimized for cost efficiency)"
         )
         chunk_size_description.setFont(QFont("Segoe UI", 8))
         chunk_size_description.setStyleSheet("color: #666666;")
@@ -338,15 +338,15 @@ class MainWindow(QMainWindow):
         api_key_layout = QVBoxLayout()
         api_key_layout.setContentsMargins(0, 0, 0, 0)
         api_key_layout.setSpacing(0)
-        api_key_label = QLabel("Gemini API Key:")
+        api_key_label = QLabel("OpenAI API Key:")
         api_key_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
         api_key_label.setStyleSheet("color: #333333;")
         self.api_key_input = QLineEdit()
-        self.api_key_input.setPlaceholderText("Enter your Gemini API key")
+        self.api_key_input.setPlaceholderText("Enter your OpenAI API key")
         self.api_key_input.setFont(QFont("Segoe UI", 9))
         self.api_key_input.setStyleSheet(self.get_input_style())
         self.api_key_input.setEchoMode(QLineEdit.Password)
-        self.api_key_input.setText(os.environ.get("GEMINI_API_KEY", ""))
+        self.api_key_input.setText(os.environ.get("OPENAI_API_KEY", ""))
         api_key_layout.addWidget(api_key_label)
         api_key_layout.addWidget(self.api_key_input)
         input_layout.addLayout(api_key_layout)
@@ -665,7 +665,7 @@ class MainWindow(QMainWindow):
             msg_box = QMessageBox()
             msg_box.setStyleSheet("color: #333333; background-color: white;")
             msg_box.setIcon(QMessageBox.Warning)
-            msg_box.setText("Please enter your Gemini API key")
+            msg_box.setText("Please enter your OpenAI API key")
             msg_box.setWindowTitle("API Key Required")
             msg_box.exec_()
             return False
@@ -761,12 +761,12 @@ class MainWindow(QMainWindow):
             if button.text().startswith("Choose"):
                 button.setEnabled(not processing)
 
-    def select_gemini_model(self):
+    def select_gpt5_model(self):
         """Optional model selector; you can remove or adapt this as needed."""
         msg_box = QMessageBox()
         msg_box.setStyleSheet("color: #333333; background-color: white;")
         msg_box.setWindowTitle("Select Gemini Model")
-        msg_box.setText("Choose a Gemini model for refinement:")
+        msg_box.setText("Choose a GPT-5 model for refinement:")
 
         # Option 1: For brevity, we assume you always return the default
         # return self.selected_model_name
@@ -826,7 +826,7 @@ class MainWindow(QMainWindow):
         if not self.validate_inputs():
             return
 
-        selected_model = self.select_gemini_model()
+        selected_model = self.select_gpt5_model()
         if not selected_model:
             return  # If user somehow cancels model selection
         self.selected_model_name = selected_model
@@ -877,15 +877,15 @@ class MainWindow(QMainWindow):
     
         self.extraction_thread.progress_update.connect(self.progress_bar.setValue)
         self.extraction_thread.status_update.connect(self.update_status)
-        self.extraction_thread.extraction_complete.connect(self.start_gemini_processing)
+        self.extraction_thread.extraction_complete.connect(self.start_gpt5_processing)
         self.extraction_thread.error_occurred.connect(self.handle_error)
     
         self.status_display.append("<font color='#3498db'>Starting transcript extraction...</font>")
         self.extraction_thread.start()
 
-    def start_gemini_processing(self, transcript_file):
+    def start_gpt5_processing(self, transcript_file):
         """
-        Starts the Gemini API processing thread after transcript extraction.
+        Starts the GPT-5 API processing thread after transcript extraction.
         
         Args:
             transcript_file (str): Path to the extracted transcript file
@@ -894,12 +894,12 @@ class MainWindow(QMainWindow):
         1. Resets the progress indicator
         2. Gets the selected language and chunk size settings
         3. Collects all selected refinement style prompts
-        4. Creates and starts the GeminiProcessingThread
+        4. Creates and starts the GPT5ProcessingThread
         
         This is typically called automatically when transcript extraction completes.
         """
         self.progress_bar.setValue(0)
-        self.status_display.append("<font color='#27ae60'>Transcript extraction complete! Starting Gemini processing...</font>")
+        self.status_display.append("<font color='#27ae60'>Transcript extraction complete! Starting GPT-5 processing...</font>")
 
         output_language = self.language_input.text()
         current_chunk_size = self.chunk_size_slider.value()
@@ -907,7 +907,7 @@ class MainWindow(QMainWindow):
         # Collect multiple prompts from checkboxes
         selected_prompts = self.get_selected_styles()  # list of (style_name, prompt_text)
 
-        self.gemini_thread = GeminiProcessingThread(
+        self.gpt5_thread = GPT5ProcessingThread(
             transcript_file,
             self.summary_output_dir_input.text(),
             self.api_key_input.text(),
@@ -917,14 +917,14 @@ class MainWindow(QMainWindow):
             selected_prompts=selected_prompts  # CHANGED
         )
 
-        self.gemini_thread.progress_update.connect(self.update_gemini_progress)
-        self.gemini_thread.status_update.connect(self.update_status)
-        self.gemini_thread.processing_complete.connect(self.handle_success)
-        self.gemini_thread.error_occurred.connect(self.handle_error)
+        self.gpt5_thread.progress_update.connect(self.update_gpt5_progress)
+        self.gpt5_thread.status_update.connect(self.update_status)
+        self.gpt5_thread.processing_complete.connect(self.handle_success)
+        self.gpt5_thread.error_occurred.connect(self.handle_error)
 
-        self.gemini_thread.start()
+        self.gpt5_thread.start()
 
-    def update_gemini_progress(self, progress_percent):
+    def update_gpt5_progress(self, progress_percent):
         self.progress_bar.setValue(progress_percent)
 
     def update_status(self, message):
@@ -964,10 +964,10 @@ class MainWindow(QMainWindow):
             self.extraction_thread.quit()
             self.extraction_thread.wait()
 
-        if self.gemini_thread and self.gemini_thread.isRunning():
-            self.gemini_thread.stop()
-            self.gemini_thread.quit()
-            self.gemini_thread.wait()
+        if self.gpt5_thread and self.gpt5_thread.isRunning():
+            self.gpt5_thread.stop()
+            self.gpt5_thread.quit()
+            self.gpt5_thread.wait()
 
         self.set_processing_state(False)
         self.status_display.append("<font color='#e74c3c'>Processing cancelled by user</font>")
@@ -990,7 +990,7 @@ class MainWindow(QMainWindow):
         options = QFileDialog.Options()
         options |= QFileDialog.ShowDirsOnly
         dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Gemini Output Folder", "", options=options)
+            self, "Select GPT-5 Output Folder", "", options=options)
         if dir_path:
             self.summary_output_dir_input.setText(dir_path)
 
@@ -1258,12 +1258,12 @@ class TranscriptExtractionThread(QThread):
         self._is_running = False
 
 
-class GeminiProcessingThread(QThread):
+class GPT5ProcessingThread(QThread):
     """
-    Thread for processing transcripts with the Gemini API.
+    Thread for processing transcripts with the OpenAI GPT-5 API.
     
     This class handles the refinement and formatting of transcripts using
-    Google's Gemini API. It processes transcript text in chunks to handle
+    OpenAI's GPT-5 API. It processes transcript text in chunks to handle
     large transcripts efficiently and applies multiple refinement styles
     based on user selection.
     
@@ -1284,13 +1284,13 @@ class GeminiProcessingThread(QThread):
 
     def __init__(self, input_file, output_dir, api_key, selected_model_name, output_language, chunk_size, selected_prompts):
         """
-        Initializes the Gemini processing thread.
+        Initializes the GPT-5 processing thread.
         
         Args:
             input_file (str): Path to the transcript file to process
             output_dir (str): Directory where processed files will be saved
-            api_key (str): Google Gemini API key
-            selected_model_name (str): Name of the Gemini model to use
+            api_key (str): OpenAI API key
+            selected_model_name (str): Name of the GPT-5 model to use
             output_language (str): Target language for the output
             chunk_size (int): Maximum words per API call
             selected_prompts (list): List of tuples (style_name, prompt_text) for processing
@@ -1307,22 +1307,22 @@ class GeminiProcessingThread(QThread):
         self.output_language = output_language
         self.selected_prompts = selected_prompts  # list of (style_name, prompt_text)
         self._is_running = True
-        logging.basicConfig(filename='gemini_processing.log',
+        logging.basicConfig(filename='gpt5_processing.log',
                             level=logging.ERROR,
                             format='%(asctime)s - %(levelname)s - %(message)s')
 
     def run(self):
         """
-        Main execution method for the Gemini processing thread.
+        Main execution method for the GPT-5 processing thread.
         
         This method:
-        1. Configures the Gemini API with the provided key
+        1. Configures the OpenAI API with the provided key
         2. Splits the transcript file into individual video sections
         3. For each video:
            - Extracts the title, URL, and transcript text
            - For each selected refinement style:
               - Splits the transcript into manageable chunks
-              - Processes each chunk with the Gemini API
+              - Processes each chunk with the GPT-5 API
               - Combines the responses
               - Saves the result to a markdown file
         4. Emits progress and completion signals
@@ -1330,7 +1330,7 @@ class GeminiProcessingThread(QThread):
         Error handling includes logging exceptions and emitting error signals.
         """
         try:
-            genai.configure(api_key=self.api_key)
+            client = openai.OpenAI(api_key=self.api_key)
             video_data_chunks = self.split_videos_by_title(self.input_file)
             total_videos = len(video_data_chunks)
 
@@ -1386,14 +1386,26 @@ class GeminiProcessingThread(QThread):
 
                         full_prompt = f"{context_prompt}{formatted_prompt}\n\n{chunk}"
 
-                        model = genai.GenerativeModel(self.selected_model_name)
                         self.status_update.emit(
                             f"Generating style '{style_name}' for Video {video_index + 1}, Chunk {chunk_index + 1}/{len(video_transcript_chunks)}..."
                         )
-                        response = model.generate_content(full_prompt)
+                        
+                        # Use appropriate parameters based on model
+                        if 'gpt-5' in self.selected_model_name.lower():
+                            response = client.chat.completions.create(
+                                model=self.selected_model_name,
+                                messages=[{"role": "user", "content": full_prompt}]
+                            )
+                        else:
+                            response = client.chat.completions.create(
+                                model=self.selected_model_name,
+                                messages=[{"role": "user", "content": full_prompt}],
+                                temperature=0.7
+                            )
 
-                        full_video_response += response.text + "\n\n"
-                        previous_response = response.text
+                        response_text = response.choices[0].message.content
+                        full_video_response += response_text + "\n\n"
+                        previous_response = response_text
 
                         self.status_update.emit(f"Chunk {chunk_index + 1}/{len(video_transcript_chunks)} processed for style '{style_name}'.")
 
@@ -1418,14 +1430,14 @@ class GeminiProcessingThread(QThread):
                 progress_percent = int(((video_index + 1) / total_videos) * 100) if total_videos > 0 else 100
                 self.progress_update.emit(progress_percent)
 
-            self.status_update.emit(f"All Gemini responses saved to individual files in {self.output_dir}.")
+            self.status_update.emit(f"All GPT-5 responses saved to individual files in {self.output_dir}.")
             self.processing_complete.emit(self.output_dir)
             self.progress_update.emit(100)
 
         except Exception as e:
-            error_message = f"Gemini processing error: {str(e)}"
+            error_message = f"GPT-5 processing error: {str(e)}"
             self.error_occurred.emit(error_message)
-            logging.exception("Gemini processing error")
+            logging.exception("GPT-5 processing error")
             
     def split_text_into_chunks(self, text, chunk_size, min_chunk_size=500):
         """

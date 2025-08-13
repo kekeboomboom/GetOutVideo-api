@@ -35,9 +35,9 @@ class ProcessingConfig:
     """Configuration for AI processing."""
     
     chunk_size: int = 70000
-    model_name: str = "gemini-2.5-flash"
+    model_name: str = "gpt-4o-mini"
     output_language: str = "English"
-    styles: Optional[List[str]] = None  # Uses all styles by default
+    styles: Optional[List[str]] = field(default_factory=lambda: ["Summary"])  # Default to Summary style only
     
     def __post_init__(self):
         """Validate configuration values."""
@@ -51,27 +51,25 @@ class ProcessingConfig:
 class APIConfig:
     """Main configuration object containing all API settings."""
     
-    gemini_api_key: str
-    openai_api_key: Optional[str] = None
+    openai_api_key: str
+    gemini_api_key: Optional[str] = None
     transcript_config: TranscriptConfig = field(default_factory=TranscriptConfig)
     processing_config: ProcessingConfig = field(default_factory=ProcessingConfig)
     
     def __post_init__(self):
         """Validate API keys and load from environment if needed."""
         # Load from environment variables if not provided
-        if not self.gemini_api_key:
-            self.gemini_api_key = os.getenv("GEMINI_API_KEY", "")
-        
         if not self.openai_api_key:
-            self.openai_api_key = os.getenv("OPENAI_API_KEY")
+            self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        
+        if not self.gemini_api_key:
+            self.gemini_api_key = os.getenv("GEMINI_API_KEY")
             
         # Validate required keys
-        if not self.gemini_api_key:
-            raise ValueError("gemini_api_key is required (set directly or via GEMINI_API_KEY env var)")
+        if not self.openai_api_key:
+            raise ValueError("openai_api_key is required (set directly or via OPENAI_API_KEY env var)")
         
-        # Validate if AI fallback is enabled but OpenAI key is missing
-        if self.transcript_config.use_ai_fallback and not self.openai_api_key:
-            raise ValueError("openai_api_key is required when use_ai_fallback is True (set directly or via OPENAI_API_KEY env var)")
+        # OpenAI key is now required as primary API
 
 
 def load_config_from_env() -> APIConfig:
@@ -79,16 +77,16 @@ def load_config_from_env() -> APIConfig:
     Load configuration from environment variables.
     
     Expected environment variables:
-    - GEMINI_API_KEY (required)
-    - OPENAI_API_KEY (optional, required if using AI fallback)
+    - OPENAI_API_KEY (required)
+    - GEMINI_API_KEY (optional, for backward compatibility)
     - LANGUAGE (optional, defaults to "English")
     
     Returns:
         APIConfig: Configured API settings
     """
     return APIConfig(
-        gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
-        openai_api_key=os.getenv("OPENAI_API_KEY"),
+        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+        gemini_api_key=os.getenv("GEMINI_API_KEY"),
         processing_config=ProcessingConfig(
             output_language=os.getenv("LANGUAGE", "English")
         )

@@ -41,6 +41,13 @@ from openai import OpenAI
 import ffmpeg
 import sys
 
+# Import centralized URLs
+try:
+    from api.config_urls import FALLBACK_TEST_URL
+except ImportError:
+    # Fallback if not available
+    FALLBACK_TEST_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
 
 # Placeholder function for AI-based Speech-to-Text
 def get_transcript_with_ai_stt(video_url, video_title, cookie_path, transcript_file_path, cleanup_intermediate_files=False):
@@ -463,7 +470,7 @@ def download_youtube_audio(video_url, output_path, cookie_path=None):
 
 # Example Usage (updated)
 if __name__ == "__main__":
-    test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ" # Example URL
+    test_url = FALLBACK_TEST_URL  # Example URL from centralized config
     test_title = "Rick Astley - Never Gonna Give You Up (Official Music Video)"
     # Example cookie file path (replace with your actual path if testing)
     test_cookie_path = "cookie.txt" # Assumes cookie.txt is in the same directory

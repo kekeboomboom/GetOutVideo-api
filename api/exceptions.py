@@ -41,7 +41,7 @@ class GeminiAPIError(AIProcessingError):
     pass
 
 
-class OpenAIAPIError(TranscriptExtractionError):
+class OpenAIAPIError(AIProcessingError):
     """Raised when OpenAI API calls fail."""
     pass
 

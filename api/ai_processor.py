@@ -2,36 +2,36 @@
 AI processing functionality for the WatchYTPL4Me API.
 
 This module provides the AI processing logic adapted from the original
-GUI application's GeminiProcessingThread class.
+GUI application's GPT5ProcessingThread class.
 """
 
 import os
 import time
 from typing import List, Optional, Callable
-import google.generativeai as genai
+import openai
 
 from .config import APIConfig
 from .models import VideoTranscript, ProcessingResult
-from .exceptions import AIProcessingError, GeminiAPIError, FileOperationError
+from .exceptions import AIProcessingError, OpenAIAPIError, FileOperationError
 from .prompts import text_refinement_prompts, get_available_styles, get_prompt_for_style
 from .utils import sanitize_filename, split_text_into_chunks, safe_progress_callback, safe_status_callback, ensure_directory_exists
 
 
 class AIProcessor:
     """
-    Processes video transcripts using Google's Gemini API.
+    Processes video transcripts using OpenAI's GPT-5 API.
     
     This class provides AI processing functionality for refining transcripts
     using various processing styles and handling large transcripts through chunking.
     """
     
-    # Gemini pricing per 1K tokens (as of current rates)
-    # These are approximate rates and should be updated based on current Google pricing
-    GEMINI_PRICING = {
-        "gemini-1.5-flash": {"input": 0.000075, "output": 0.0003},  # per 1K tokens
-        "gemini-1.5-pro": {"input": 0.00125, "output": 0.005},     # per 1K tokens
-        "gemini-1.0-pro": {"input": 0.0005, "output": 0.0015},     # per 1K tokens
-        "gemini-2.5-flash": {"input": 0.000075, "output": 0.0003}, # per 1K tokens (same as 1.5-flash)
+    # OpenAI GPT-5 pricing per 1M tokens (as of current rates)
+    # These are approximate rates and should be updated based on current OpenAI pricing
+    OPENAI_PRICING = {
+        "gpt-5": {"input": 1.25, "output": 10.00},           # per 1M tokens
+        "gpt-4-turbo": {"input": 10.00, "output": 30.00},   # per 1M tokens
+        "gpt-4o": {"input": 5.00, "output": 15.00},         # per 1M tokens
+        "gpt-4o-mini": {"input": 0.15, "output": 0.60},     # per 1M tokens
     }
     
     def __init__(self, config: APIConfig):
@@ -39,33 +39,33 @@ class AIProcessor:
         Initialize the AI processor.
         
         Args:
-            config: API configuration containing Gemini settings
+            config: API configuration containing OpenAI settings
         """
         self.config = config
         self._cancelled = False
         
-        # Configure Gemini API
-        genai.configure(api_key=config.gemini_api_key)
+        # Configure OpenAI API
+        self.client = openai.OpenAI(api_key=config.openai_api_key)
     
     def cancel(self) -> None:
         """Cancel the current processing operation."""
         self._cancelled = True
     
-    def _calculate_gemini_cost(self, input_tokens: int, output_tokens: int, model_name: str) -> float:
+    def _calculate_openai_cost(self, input_tokens: int, output_tokens: int, model_name: str) -> float:
         """
-        Calculate the cost of Gemini API usage.
+        Calculate the cost of OpenAI API usage.
         
         Args:
             input_tokens: Number of input tokens
             output_tokens: Number of output tokens  
-            model_name: Name of the Gemini model used
+            model_name: Name of the OpenAI model used
             
         Returns:
             float: Cost in USD
         """
-        pricing = self.GEMINI_PRICING.get(model_name, self.GEMINI_PRICING.get("gemini-1.5-flash"))
-        input_cost = (input_tokens / 1000) * pricing["input"]
-        output_cost = (output_tokens / 1000) * pricing["output"]
+        pricing = self.OPENAI_PRICING.get(model_name, self.OPENAI_PRICING.get("gpt-5"))
+        input_cost = (input_tokens / 1000000) * pricing["input"]  # OpenAI pricing is per 1M tokens
+        output_cost = (output_tokens / 1000000) * pricing["output"]  # OpenAI pricing is per 1M tokens
         return input_cost + output_cost
     
     def process_transcripts(self,
@@ -224,32 +224,44 @@ class AIProcessor:
                 formatted_prompt = style_prompt.replace("[Language]", self.config.processing_config.output_language)
                 full_prompt = f"{formatted_prompt}\n\n{chunk}"
                 
-                # Generate content with Gemini
+                # Generate content with OpenAI GPT-5
                 try:
-                    model = genai.GenerativeModel(self.config.processing_config.model_name)
                     safe_status_callback(status_callback,
                                        f"Generating style '{style_name}' for Video {video_index}, "
                                        f"Chunk {chunk_index + 1}/{len(chunks)}...")
                     
-                    response = model.generate_content(full_prompt)
-                    full_response += response.text + "\n\n"
+                    # Use appropriate parameters based on model
+                    if 'gpt-5' in self.config.processing_config.model_name.lower():
+                        response = self.client.chat.completions.create(
+                            model=self.config.processing_config.model_name,
+                            messages=[{"role": "user", "content": full_prompt}]
+                        )
+                    else:
+                        response = self.client.chat.completions.create(
+                            model=self.config.processing_config.model_name,
+                            messages=[{"role": "user", "content": full_prompt}],
+                            temperature=0.7
+                        )
+                    
+                    response_text = response.choices[0].message.content
+                    full_response += response_text + "\n\n"
                     
                     # Track token usage if available
-                    if hasattr(response, 'usage_metadata') and response.usage_metadata:
-                        total_input_tokens += response.usage_metadata.prompt_token_count or 0
-                        total_output_tokens += response.usage_metadata.candidates_token_count or 0
+                    if hasattr(response, 'usage') and response.usage:
+                        total_input_tokens += response.usage.prompt_tokens or 0
+                        total_output_tokens += response.usage.completion_tokens or 0
                         safe_status_callback(status_callback,
                                            f"Chunk {chunk_index + 1}/{len(chunks)} tokens: "
-                                           f"input={response.usage_metadata.prompt_token_count}, "
-                                           f"output={response.usage_metadata.candidates_token_count}")
+                                           f"input={response.usage.prompt_tokens}, "
+                                           f"output={response.usage.completion_tokens}")
                     
                     safe_status_callback(status_callback,
                                        f"Chunk {chunk_index + 1}/{len(chunks)} processed for style '{style_name}'.")
                     
                 except Exception as e:
-                    error_msg = f"Gemini API error for chunk {chunk_index + 1}: {str(e)}"
+                    error_msg = f"OpenAI API error for chunk {chunk_index + 1}: {str(e)}"
                     safe_status_callback(status_callback, error_msg)
-                    raise GeminiAPIError(error_msg) from e
+                    raise OpenAIAPIError(error_msg) from e
             
             # Save the processed content to file
             output_filename = f"{sanitized_title} [{style_name}].md"
@@ -263,14 +275,14 @@ class AIProcessor:
                     f.write(full_response.strip())
                 
                 # Calculate cost
-                gemini_cost = self._calculate_gemini_cost(total_input_tokens, total_output_tokens, 
+                openai_cost = self._calculate_openai_cost(total_input_tokens, total_output_tokens, 
                                                         self.config.processing_config.model_name)
                 
                 safe_status_callback(status_callback,
                                    f"Saved '{style_name}' output for video {video_index} to {output_path}")
                 safe_status_callback(status_callback,
-                                   f"Gemini usage - Input tokens: {total_input_tokens}, "
-                                   f"Output tokens: {total_output_tokens}, Cost: ${gemini_cost:.6f}")
+                                   f"OpenAI usage - Input tokens: {total_input_tokens}, "
+                                   f"Output tokens: {total_output_tokens}, Cost: ${openai_cost:.6f}")
                 
                 return ProcessingResult(
                     video_transcript=transcript,
@@ -278,9 +290,9 @@ class AIProcessor:
                     output_file_path=output_path,
                     processing_time=0.0,  # Will be set by caller
                     chunk_count=len(chunks),
-                    gemini_input_tokens=total_input_tokens,
-                    gemini_output_tokens=total_output_tokens,
-                    gemini_cost=gemini_cost
+                    openai_input_tokens=total_input_tokens,
+                    openai_output_tokens=total_output_tokens,
+                    openai_cost=openai_cost
                 )
                 
             except IOError as e:

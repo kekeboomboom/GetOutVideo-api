@@ -8,6 +8,7 @@ from api import WatchYTPL4MeAPI, process_youtube_playlist, extract_transcripts_o
 from api.config import APIConfig, TranscriptConfig, ProcessingConfig
 from api.models import VideoTranscript, ProcessingResult
 from api.exceptions import ConfigurationError
+from api.config_urls import UNIT_TEST_URL
 
 
 class TestWatchYTPL4MeAPI:
@@ -35,7 +36,7 @@ class TestWatchYTPL4MeAPI:
         # Setup mocks
         mock_transcript = VideoTranscript(
             title="Test Video",
-            url="https://youtube.com/watch?v=test",
+            url=UNIT_TEST_URL,
             transcript_text="Test transcript text",
             source="youtube_api"
         )
@@ -53,7 +54,7 @@ class TestWatchYTPL4MeAPI:
         # Test the API
         api = WatchYTPL4MeAPI("test-key", "openai-key")
         result = api.process_youtube_url(
-            "https://youtube.com/watch?v=test",
+            UNIT_TEST_URL,
             "/output",
             styles=["Summary"]
         )
@@ -67,14 +68,14 @@ class TestWatchYTPL4MeAPI:
         """Test transcript extraction only."""
         mock_transcript = VideoTranscript(
             title="Test Video",
-            url="https://youtube.com/watch?v=test",
+            url=UNIT_TEST_URL,
             transcript_text="Test transcript text",
             source="youtube_api"
         )
         mock_extract.return_value = [mock_transcript]
         
         api = WatchYTPL4MeAPI("test-key", "openai-key")
-        result = api.extract_transcripts("https://youtube.com/watch?v=test")
+        result = api.extract_transcripts(UNIT_TEST_URL)
         
         assert len(result) == 1
         assert result[0].title == "Test Video"
@@ -113,14 +114,14 @@ class TestConvenienceFunctions:
         """Test the convenience transcript extraction function."""
         mock_transcript = VideoTranscript(
             title="Test Video",
-            url="https://youtube.com/watch?v=test",
+            url=UNIT_TEST_URL,
             transcript_text="Test transcript text",
             source="youtube_api"
         )
         mock_extract.return_value = [mock_transcript]
         
         result = extract_transcripts_only(
-            "https://youtube.com/watch?v=test",
+            UNIT_TEST_URL,
             "test-key",
             "openai-key"
         )

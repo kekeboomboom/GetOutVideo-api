@@ -3,11 +3,18 @@ Tests for configuration classes and validation.
 """
 
 import pytest
+
+from api import get_available_styles
 from api.config import APIConfig, TranscriptConfig, ProcessingConfig
+from prompts import text_refinement_prompts
 
 
 class TestTranscriptConfig:
     """Test TranscriptConfig validation."""
+
+    def test_style(self):
+        testmap = text_refinement_prompts
+        print(get_available_styles())
     
     def test_default_values(self):
         """Test default configuration values."""
