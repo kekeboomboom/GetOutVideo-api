@@ -1,8 +1,19 @@
 # GetOutVideo API
 
-**Extract and process YouTube video transcripts with AI**
+**Transform YouTube videos into professional documents with AI**
 
-GetOutVideo is a Python library that makes it easy to extract transcripts from YouTube videos and playlists, then process them using OpenAI's GPT models to create well-formatted, readable documents in various styles.
+GetOutVideo is a Python API that converts YouTube videos into structured, readable documents. Simply provide a YouTube URL, and it extracts transcripts and transforms them into professional-quality materials using OpenAI's GPT models.
+
+## What it does
+
+Turn any YouTube video or playlist into:
+- **Summaries** - Quick overviews and key points
+- **Educational materials** - Structured lessons and tutorials  
+- **Documentation** - Technical guides and how-tos
+- **Study notes** - Q&A format and bullet points
+- **Research content** - Comprehensive analysis
+
+Perfect for students, researchers, content creators, and professionals who want to convert video content into text-based learning materials.
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -68,129 +79,181 @@ files = process_youtube_playlist(
     openai_api_key="your-openai-api-key"
 )
 
-print(f"Generated {len(files)} files!")
+print(f"Generated {len(files)} documents!")
+# Creates: video_title [Summary].md, video_title [Educational].md, etc.
 ```
 
-### Advanced Usage
+### Process Specific Styles
 
 ```python
 from getoutvideo import GetOutVideoAPI
 
-# Initialize the API
 api = GetOutVideoAPI(openai_api_key="your-openai-api-key")
 
-# Process with specific options
-output_files = api.process_youtube_url(
-    url="https://www.youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMw6luKi_8LlH4b1vD",
+# Generate only summaries and key points
+files = api.process_youtube_url(
+    url="https://www.youtube.com/watch?v=VIDEO_ID",
     output_dir="./summaries",
-    styles=["Summary", "Key Points"],
-    start_index=1,
-    end_index=5,
-    output_language="Spanish",
-    chunk_size=50000
+    styles=["Summary", "Key Points"]
 )
 ```
 
-### Two-Step Processing
+### Process Playlists
 
 ```python
+# Process entire playlist
+files = process_youtube_playlist(
+    url="https://www.youtube.com/playlist?list=PLAYLIST_ID",
+    output_dir="./course_materials",
+    openai_api_key="your-openai-api-key",
+    start_index=1,    # First video
+    end_index=5       # Stop after 5 videos (0 = all)
+)
+```
+
+## How It Works
+
+1. **Extract** - Downloads transcripts from YouTube (with AI fallback when needed)
+2. **Process** - Uses OpenAI's GPT models to format and structure content  
+3. **Generate** - Creates professional markdown documents in multiple styles
+
+## Available Processing Styles
+
+GetOutVideo creates different document types from the same video:
+
+| Style | Best For | Output Format |
+|-------|----------|---------------|
+| **Summary** | Quick overviews | Concise main points |
+| **Educational** | Learning materials | Structured lessons with examples |
+| **Key Points** | Study notes | Bullet-pointed highlights |
+| **Q&A** | Training materials | Question and answer format |
+| **Technical** | Documentation | Step-by-step instructions |
+| **Balanced** | Comprehensive reports | Full detailed coverage |
+
+```python
+# Get all available styles
 from getoutvideo import GetOutVideoAPI
-
-api = GetOutVideoAPI(openai_api_key="your-openai-api-key")
-
-# Step 1: Extract transcripts
-transcripts = api.extract_transcripts("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-
-# Step 2: Process with different styles
-educational_files = api.process_with_ai(transcripts, "./educational", 
-                                      styles=["Educational"])
-summary_files = api.process_with_ai(transcripts, "./summaries", 
-                                   styles=["Summary"])
+api = GetOutVideoAPI(openai_api_key="your-key")
+print(api.get_available_styles())
 ```
 
 ## Configuration
 
-### Environment Variables
-
-You can set up environment variables for easier configuration:
+### Using Environment Variables
 
 ```bash
 export OPENAI_API_KEY="your-openai-api-key"
-export LANGUAGE="English"  # Default output language
+export LANGUAGE="English"
 ```
-
-Then use:
 
 ```python
 from getoutvideo import load_api_from_env
-
-api = load_api_from_env()
-# API is configured from environment variables
+api = load_api_from_env()  # Uses environment variables
 ```
-
-### Processing Styles
-
-GetOutVideo includes several built-in processing styles:
-
-- **Summary**: Concise overview of main points
-- **Educational**: Structured learning material
-- **Key Points**: Bullet-pointed highlights
-- **Q&A**: Question and answer format
-- **Technical**: Detailed technical documentation
-- **Balanced**: Comprehensive balanced overview
 
 ## API Reference
 
-### Main Classes
+### Main Functions
 
-#### `GetOutVideoAPI`
-
-The main API class for processing YouTube content.
+#### `process_youtube_playlist()`
+One-line processing for videos and playlists:
 
 ```python
-api = GetOutVideoAPI(
-    openai_api_key="your-key",
-    gemini_api_key="optional-gemini-key"  # For backward compatibility
+from getoutvideo import process_youtube_playlist
+
+files = process_youtube_playlist(
+    url="https://www.youtube.com/watch?v=VIDEO_ID",
+    output_dir="./output",
+    openai_api_key="your-openai-api-key",
+    styles=["Summary", "Key Points"],  # Optional
+    start_index=1,                     # Optional: playlist start
+    end_index=0,                       # Optional: end (0 = all)
+    output_language="English"          # Optional
 )
 ```
 
-**Methods:**
-
-- `process_youtube_url(url, output_dir, **options)` - Process URL with AI in one call
-- `extract_transcripts(url, config=None)` - Extract transcripts only
-- `process_with_ai(transcripts, output_dir, config=None)` - Process existing transcripts
-- `get_available_styles()` - List available processing styles
-- `cancel_operations()` - Cancel ongoing operations
-
-### Convenience Functions
-
-#### `process_youtube_playlist()`
-
-Quick function for simple processing:
+#### `GetOutVideoAPI` Class
+For advanced control:
 
 ```python
-files = process_youtube_playlist(
-    url="youtube_url",
-    output_dir="output_directory",
-    openai_api_key="your_key",
-    styles=["Summary"],  # Optional
-    start_index=1,       # Optional
-    end_index=0,         # Optional (0 = all)
-    output_language="English"  # Optional
-)
+from getoutvideo import GetOutVideoAPI
+
+api = GetOutVideoAPI(openai_api_key="your-openai-api-key")
+
+# Process videos
+files = api.process_youtube_url(url, output_dir, styles=["Summary"])
+
+# Extract transcripts only
+transcripts = api.extract_transcripts(url)
+
+# Process existing transcripts
+results = api.process_with_ai(transcripts, output_dir, styles=["Technical"])
 ```
 
 #### `extract_transcripts_only()`
-
-Extract transcripts without AI processing:
+Get raw transcripts without AI processing:
 
 ```python
+from getoutvideo import extract_transcripts_only
+
 transcripts = extract_transcripts_only(
-    url="youtube_url",
-    openai_api_key="your_key",
-    use_ai_fallback=True
+    url="https://www.youtube.com/watch?v=VIDEO_ID",
+    openai_api_key="your-openai-api-key"
 )
 ```
+
+## Use Cases
+
+### Course Materials
+```python
+# Convert lectures to study materials
+study_files = process_youtube_playlist(
+    url="https://www.youtube.com/playlist?list=COURSE_PLAYLIST",
+    output_dir="./course_materials",
+    openai_api_key="your-key",
+    styles=["Educational", "Key Points"]
+)
+```
+
+### Technical Documentation
+```python
+# Turn tutorial videos into documentation
+api = GetOutVideoAPI(openai_api_key="your-key")
+transcripts = api.extract_transcripts("https://www.youtube.com/watch?v=TUTORIAL_ID")
+docs = api.process_with_ai(transcripts, "./docs", styles=["Technical"])
+```
+
+### Research and Analysis
+```python
+# Process conference talks for research
+files = process_youtube_playlist(
+    url="https://www.youtube.com/watch?v=CONFERENCE_TALK",
+    output_dir="./research",
+    openai_api_key="your-key",
+    styles=["Balanced", "Summary"]
+)
+```
+
+## Output Files
+
+Generated files follow this naming pattern:
+```
+{video_title} [{style_name}].md
+```
+
+Example output for "Python Tutorial":
+```
+📁 output/
+├── Python_Tutorial [Summary].md
+├── Python_Tutorial [Educational].md  
+├── Python_Tutorial [Key Points].md
+└── Python_Tutorial [Technical].md
+```
+
+Each file contains:
+- Original video URL
+- Structured content in markdown format
+- Style-specific formatting (bullets, sections, Q&A, etc.)
 
 ## Error Handling
 
@@ -199,112 +262,40 @@ from getoutvideo import GetOutVideoAPI, GetOutVideoError
 
 try:
     api = GetOutVideoAPI(openai_api_key="your-key")
-    files = api.process_youtube_url(url, output_dir)
+    files = api.process_youtube_url(url="...", output_dir="./output")
+    print(f"Success: {len(files)} files generated")
 except GetOutVideoError as e:
     print(f"API Error: {e}")
 except Exception as e:
-    print(f"Unexpected error: {e}")
+    print(f"Error: {e}")
 ```
 
-## Examples
+## Rate Limits and Costs
 
-Check out the `examples/` directory for comprehensive usage examples:
-
-- `examples/basic_usage.py` - Simple examples for getting started
-- `examples/advanced_usage.py` - Advanced features and configurations
-
-## Configuration Options
-
-### Transcript Configuration
-
-- `start_index`: Starting video index for playlists (1-based)
-- `end_index`: Ending video index (0 = process all)
-- `use_ai_fallback`: Use OpenAI transcription when YouTube transcripts unavailable
-- `cookie_path`: Path to browser cookies for restricted content
-- `cleanup_temp_files`: Remove temporary audio files after processing
-
-### Processing Configuration
-
-- `styles`: List of processing styles to apply
-- `chunk_size`: Maximum words per API call (default: 70,000)
-- `output_language`: Target language for output
-- `max_concurrent_requests`: Limit concurrent API calls
-
-## Output Formats
-
-GetOutVideo generates markdown files with the following naming pattern:
-```
-{video_title} [{style_name}].md
-```
-
-Each file includes:
-- Video title as H1 header
-- Original video URL
-- AI-processed content in the specified style
-
-## Rate Limiting and Costs
-
-- The library respects OpenAI's rate limits
-- Processing costs depend on transcript length and selected models
-- Use smaller `chunk_size` values to reduce per-request costs
-- Consider using specific `styles` instead of processing all styles
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite: `pytest`
-6. Submit a pull request
+- Respects OpenAI rate limits automatically
+- Costs depend on transcript length and models used
+- Use specific `styles` parameter to reduce processing
+- Adjust `chunk_size` for cost optimization
 
 ## Development
-
-### Setting up the development environment
 
 ```bash
 git clone https://github.com/yourusername/getoutvideo.git
 cd getoutvideo
 pip install -e ".[dev]"
-```
-
-### Running tests
-
-```bash
-pytest tests/
-```
-
-### Code formatting
-
-```bash
-black getoutvideo/
+pytest tests/          # Run tests
+black getoutvideo/     # Format code
 ```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Changelog
-
-### Version 1.0.0
-
-- Initial release
-- YouTube transcript extraction
-- OpenAI GPT processing
-- Multiple processing styles
-- Playlist support
-- Audio transcription fallback
-- Comprehensive API interface
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Documentation**: [https://getoutvideo.readthedocs.io](https://getoutvideo.readthedocs.io)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/getoutvideo/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/getoutvideo/discussions)
+- Issues: [GitHub Issues](https://github.com/yourusername/getoutvideo/issues)
+- Documentation: Full API docs and examples available
 
-## Acknowledgments
+## Credits
 
-- OpenAI for GPT models and transcription services
-- YouTube Transcript API contributors
-- PyTube and related YouTube access libraries
-- FFmpeg for audio processing capabilities
+Built with OpenAI GPT models, YouTube Transcript API, and FFmpeg for audio processing.
