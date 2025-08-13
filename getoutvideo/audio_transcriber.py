@@ -43,7 +43,7 @@ import sys
 
 # Import centralized URLs
 try:
-    from api.config_urls import FALLBACK_TEST_URL
+    from .config_urls import FALLBACK_TEST_URL
 except ImportError:
     # Fallback if not available
     FALLBACK_TEST_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"

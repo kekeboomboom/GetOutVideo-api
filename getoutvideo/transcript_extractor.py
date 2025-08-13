@@ -17,10 +17,7 @@ from .utils import safe_progress_callback, safe_status_callback
 
 # Import the AI STT fallback function from the root module
 import sys
-import importlib.util
-spec = importlib.util.spec_from_file_location("ytvideo2txt", os.path.join(os.path.dirname(os.path.dirname(__file__)), "ytvideo2txt.py"))
-ytvideo2txt = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ytvideo2txt)
+from . import audio_transcriber
 
 
 class TranscriptExtractor:
@@ -263,7 +260,7 @@ class TranscriptExtractor:
                     try:
                         print(f"DEBUG: Attempting AI STT fallback...")
                         # Use the AI STT fallback
-                        result = ytvideo2txt.get_transcript_with_ai_stt(
+                        result = audio_transcriber.get_transcript_with_ai_stt(
                             video_url, video_title, self.config.transcript_config.cookie_path, 
                             None,  # We don't need transcript_file_path for API usage
                             self.config.transcript_config.cleanup_temp_files

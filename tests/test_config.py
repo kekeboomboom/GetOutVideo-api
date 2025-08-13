@@ -4,9 +4,9 @@ Tests for configuration classes and validation.
 
 import pytest
 
-from api import get_available_styles
-from api.config import APIConfig, TranscriptConfig, ProcessingConfig
-from prompts import text_refinement_prompts
+from getoutvideo import get_available_styles
+from getoutvideo.config import APIConfig, TranscriptConfig, ProcessingConfig
+from getoutvideo.prompts import text_refinement_prompts
 
 
 class TestTranscriptConfig:

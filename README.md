@@ -1,206 +1,310 @@
-# WatchYTPL4Me: Transform YouTube Playlist into Professional-Quality Documents
+# GetOutVideo API
 
-## Project Overview
+**Extract and process YouTube video transcripts with AI**
 
-This toolkit transforms YouTube videos and playlists into highly polished text documents. It combines multiple AI-powered features to extract, transcribe, and refine video content into well-structured, readable formats.
+GetOutVideo is a Python library that makes it easy to extract transcripts from YouTube videos and playlists, then process them using OpenAI's GPT models to create well-formatted, readable documents in various styles.
 
-The suite offers a streamlined process for transforming video content:
-1. **Transcript Extraction**: For videos with existing captions, extracts them directly. For videos without captions, uses OpenAI's gpt-4o-transcribe model to generate high-quality transcripts.
-2. **Content Refinement**: All transcripts, whether extracted or AI-generated, are then processed and refined using Google's Gemini API to create polished, formatted documents in various styles.
-
-Whether you're a student creating study materials, a researcher processing interviews, or a content creator repurposing video content, this toolkit provides flexible options to convert YouTube content into clean, formatted text in multiple styles and languages.
-
-- Works nicely as an input source for NotebookLM or as a set of documents in Obsidian.  
-- Check out this [Medium Article](https://medium.com/@ebrahimgolriz444/a-tool-to-turn-entire-youtube-playlists-to-markdown-formatted-and-refined-text-books-in-any-3e8742f5d0d3) from the original author for more details.
-
-<br>
-
-<table>
-  <tr>
-    <td><img src="Images/POSTER.png" alt="Poster Image" height="400"/></td>
-    <td><img src="Images/UI.png" alt="User Interface Image" height="400"/></td>
-  </tr>
-</table>
-
-<br>
-
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PyPI version](https://badge.fury.io/py/getoutvideo.svg)](https://badge.fury.io/py/getoutvideo)
 
 ## Features
-- 🎥 Automatic transcript extraction from YouTube playlists
-- 🖥️ User-friendly UI with intuitive controls and progress updates
-- 🧠 AI-powered text refinement using Gemini models (Select between 2.5 Pro and Flash)
-- 🎙️ High-quality audio transcription using OpenAI's gpt-4o-transcribe
-- 🍪 **Cookie Support**: Optionally provide a browser cookie file to access member-only or login-required videos during AI transcription fallback.
-- 📁 Configurable output file paths
-- ⏳ Progress tracking for both extraction and refinement
-- 📄 Output to formatted markdown files, one per video **per selected style**
-- 🔢 Selective playlist processing with start/end index options
 
-<br>
-
-
-## Highlights
-
-### 1️⃣ Text Refinement Styles
-#### I. Create Multiple Styles of Documents from the Same Video:
-> You can select **one or more** refinement styles at the same time. The application will generate **separate output files** for each selected style, each appended with `[StyleName]` in its filename.  
-> For example, if you check "Balanced and Detailed" and "Educational", you will end up with two `.md` files per video:
-> ```
-> AI_News_OpenAI_Just_Dropped_An_Amazing_New_Model! [Balanced and Detailed].md
-> AI_News_OpenAI_Just_Dropped_An_Amazing_New_Model! [Educational].md
-> ```
-
-#### II. Choose from Presets of Styles or Customize:
-Here is a quick rundown of the available styles. **Note**: You can customize the styles in `prompts.py`.
-
->> ⚖️ **Balanced and Detailed**  
->> - Provides a comprehensive refinement of the transcript.  
->> - Organizes text into a well-structured, readable format with headings, bullet points, and bold text.  
->> - Preserves **every detail, context, and nuance** of the original content.  
->> - Ideal when you want a thoroughly enhanced transcript without any information loss.
-
->> 📝 **Summary**  
->> - Generates a **concise and informative** summary.  
->> - Identifies the core message, main arguments, and key pieces of information.  
->> - Great for quickly grasping **the main points** without reading the entire transcript.
-
->> 📚 **Educational**  
->> - Transforms the transcript into a **structured educational text**, like a textbook chapter.  
->> - Organizes content with headings, subheadings, and bullet points for clarity.  
->> - **Identifies and defines technical terms** in blockquotes near their first mention.  
->> - Perfect for learning or study materials (see example image below).
-
->> ✍️ **Narrative Rewriting**  
->> - **Rewrites** the transcript into an **engaging narrative** or story format.  
->> - Stays faithful to the original topics but uses storytelling techniques to enhance readability and enjoyment.
-
->> ❓ **Q&A Generation**  
->> - Generates a set of **questions and answers** based on the transcript.  
->> - Each question is presented as a **foldable header** in Markdown (`### Question Text`), with the answer hidden below.  
->> - Excellent for self-assessment, quizzes, or study guides (see example image below).
-
-<br>
-
-### 2️⃣ AI-Powered Audio Transcription
-
-We've added the capability to transcribe YouTube videos using OpenAI's powerful GPT-4o-transcribe model:
-
->> 🎙️ **Direct Audio Transcription**
->> - Extract high-quality transcripts from YouTube videos using OpenAI's gpt-4o-transcribe model
->> - Audio is automatically downloaded, intelligently segmented based on silence detection, and transcribed
->> - Handles videos in multiple languages with excellent accuracy
->> - Perfect for videos without available captions or when higher quality transcription is needed
-
->> 🔐 **Access Restricted Content (Optional)**
->> - By providing a `cookie.txt` file exported from your web browser (while logged into YouTube), the audio downloader (`yt-dlp`) can attempt to access videos that require login, such as **member-only content** or some **age-restricted videos**.
->> - This enhances the ability to transcribe a wider range of content when the standard transcript API fails.
-
->> 🔊 **Intelligent Audio Processing**
->> - Automatically segments audio based on natural speech pauses using silence detection
->> - Limits chunk size to 10 minutes maximum to ensure optimal transcription quality
->> - Optimized 128kbps audio quality balances file size and transcription accuracy
->> - Optional cleanup of intermediate audio files after processing
-
->> 🛠️ **Easy Integration**
->> - Use `ytvideo2txt.py` as a standalone tool or integrate with the main application
->> - Process a single video with one command: `python ytvideo2txt.py`
->> - Requires an OpenAI API key set as an environment variable (`OPENAI_API_KEY`)
-
-<br>
-
-### 3️⃣ Flexible Settings
-
-✅ **Language Support**: Choose the language of your output.  
-✅ **Single Video URL**: You can provide a single video link instead of a playlist.  
-✅ **Configurable Chunk Size**: Control the number of words per API call to Gemini.  
-✅ **Specify Start and End Video Indices** for partial playlist processing.  
-✅ **One Markdown File Per Video** in an output folder, each refined according to your selected style(s).  
-
-<br>
-
->> **Chunk Size**  
->> - A video is divided into chunks for processing by the AI.  
->> - For example, if you set a chunk size of 3000 words and a video has 8000 words, it's processed in three chunks (3000, 3000, 2000).  
->> - **Larger chunk sizes** can reduce API calls and speed up processing but risk losing detail or hitting token limits.  
->> - **Smaller chunk sizes** increase API calls but can preserve more nuance.  
-
-<br>
-
-## How does it work?
-1. **Show GUI**: Opens a user-friendly GUI created using `PyQt5`.
-2. **Transcript Extraction**: Fetches the transcript of every video in the playlist (or the single video provided) using `youtube_transcript_api`. Video titles are parsed using `pytubefix`.  
-3. **Audio Transcription (if needed)**: For videos without available transcripts, `ytvideo2txt` downloads the audio, segments it based on silence, and transcribes using OpenAI's gpt-4o-transcribe model.
-4. **Chunking**: Because Gemini has 1M token context windows, each video's text can be divided into chunks of 1/10 of the context window (default 70000 words, adjustable via slider).  
-5. **Refinement by Gemini**:
-   - The default output language is defined in `.env`. User can modify. 
-   - Each chunk is sent to the Gemini API with a style-specific prompt (e.g., "Educational").  
-   - The refined text is appended to the final output.  
-6. **Multiple Styles**: If you select multiple styles, the script repeats the refinement step for each style, writing each style's result into a separate `.md` file.  
-7. **Final Output**: You get a folder full of Markdown files — one per video **for each** refinement style you chose.
-
-<br>
-
-## Requirements
-- Python 3.9+
-- Google Gemini API key
-- OpenAI API key (for audio transcription feature)
-- YouTube playlist or single video URL
-- ffmpeg (for audio processing and transcription)
+- **YouTube Integration**: Extract transcripts from individual videos or entire playlists
+- **AI Processing**: Transform raw transcripts using OpenAI's GPT models
+- **Multiple Styles**: Generate summaries, educational content, Q&A, key points, and more
+- **Flexible Configuration**: Customize processing parameters, languages, and output formats
+- **Fallback Transcription**: Uses OpenAI's audio transcription when YouTube transcripts aren't available
+- **Batch Processing**: Handle multiple videos efficiently
+- **Clean API**: Simple interface for both basic and advanced use cases
 
 ## Installation
+
 ```bash
-pip install -r requirements.txt
+pip install getoutvideo
 ```
 
-## Usage
-1. **Obtain API Keys**:
-   - Get a Gemini API Key from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key)
-   - For the audio transcription feature, get an OpenAI API key from [OpenAI Platform](https://platform.openai.com/)
-2. **Run the Application**:
-   - Method 1: Double click on main.pyw (or its shortcut) to run.
-   - Method 2: Rename main.pyw back to main.py, then:
-    ```bash
-    python main.py
-    ```
-3. **In the GUI**:
-   - Enter the YouTube **Playlist URL** or **single Video link**.
-   - Select your desired **Refinement Styles** (one or more).
-   - Type your **Output Language**.
-   - Adjust the **Chunk Size** slider if needed.
-   - (Optional) Set **Start** and **End** video indices for partial playlist processing.
-   - Choose an **output folder** for the refined `.md` files.
-   - (Optional) Set a custom transcript output file if desired.
-   - (Optional) Provide the path to your browser's `cookie.txt` file via the **Cookie File** input. This is used by the AI STT fallback to potentially access member-only or login-required videos. *Export the cookie file in the Netscape format.*
-   - Enter your **Gemini API key**.
-   - Click **Start Processing** and watch progress in the status area.
+### System Requirements
 
-### Using Audio Transcription
-To use the audio transcription feature:
-1. Set your OpenAI API key as an environment variable:
-   ```bash
-   # Linux/Mac
-   export OPENAI_API_KEY=your_api_key_here
-   
-   # Windows
-   set OPENAI_API_KEY=your_api_key_here
-   ```
-2. Run the transcription script directly:
-   ```bash
-   python ytvideo2txt.py
-   ```
-   Or modify the URL and title in the script to process a specific video.
+- Python 3.8 or higher
+- FFmpeg (required for audio processing fallback)
 
+#### Installing FFmpeg
 
-<br>
+**Windows:**
+```bash
+# Using chocolatey
+choco install ffmpeg
 
-## Output Example
-<img src="Images/TXT.png" alt="Formatted Text"/>
+# Or download from https://ffmpeg.org/download.html
+```
 
-<br>
----  
+**macOS:**
+```bash
+# Using homebrew
+brew install ffmpeg
+```
 
-Enjoy quickly turning your YouTube playlists into refined Markdown "books" with definitions, summaries, Q&As, and more!
+**Linux:**
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install ffmpeg
 
----
+# CentOS/RHEL
+sudo yum install ffmpeg
+```
 
-This project is a modified and enhanced version of https://github.com/Ebrizzzz/Youtube-playlist-to-formatted-text by Ebrahim Golriz. The updates are licensed under the same MIT License.
+## Quick Start
+
+### Basic Usage
+
+```python
+from getoutvideo import process_youtube_playlist
+
+# Process a single video
+files = process_youtube_playlist(
+    url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    output_dir="./output",
+    openai_api_key="your-openai-api-key"
+)
+
+print(f"Generated {len(files)} files!")
+```
+
+### Advanced Usage
+
+```python
+from getoutvideo import GetOutVideoAPI
+
+# Initialize the API
+api = GetOutVideoAPI(openai_api_key="your-openai-api-key")
+
+# Process with specific options
+output_files = api.process_youtube_url(
+    url="https://www.youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMw6luKi_8LlH4b1vD",
+    output_dir="./summaries",
+    styles=["Summary", "Key Points"],
+    start_index=1,
+    end_index=5,
+    output_language="Spanish",
+    chunk_size=50000
+)
+```
+
+### Two-Step Processing
+
+```python
+from getoutvideo import GetOutVideoAPI
+
+api = GetOutVideoAPI(openai_api_key="your-openai-api-key")
+
+# Step 1: Extract transcripts
+transcripts = api.extract_transcripts("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+# Step 2: Process with different styles
+educational_files = api.process_with_ai(transcripts, "./educational", 
+                                      styles=["Educational"])
+summary_files = api.process_with_ai(transcripts, "./summaries", 
+                                   styles=["Summary"])
+```
+
+## Configuration
+
+### Environment Variables
+
+You can set up environment variables for easier configuration:
+
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+export LANGUAGE="English"  # Default output language
+```
+
+Then use:
+
+```python
+from getoutvideo import load_api_from_env
+
+api = load_api_from_env()
+# API is configured from environment variables
+```
+
+### Processing Styles
+
+GetOutVideo includes several built-in processing styles:
+
+- **Summary**: Concise overview of main points
+- **Educational**: Structured learning material
+- **Key Points**: Bullet-pointed highlights
+- **Q&A**: Question and answer format
+- **Technical**: Detailed technical documentation
+- **Balanced**: Comprehensive balanced overview
+
+## API Reference
+
+### Main Classes
+
+#### `GetOutVideoAPI`
+
+The main API class for processing YouTube content.
+
+```python
+api = GetOutVideoAPI(
+    openai_api_key="your-key",
+    gemini_api_key="optional-gemini-key"  # For backward compatibility
+)
+```
+
+**Methods:**
+
+- `process_youtube_url(url, output_dir, **options)` - Process URL with AI in one call
+- `extract_transcripts(url, config=None)` - Extract transcripts only
+- `process_with_ai(transcripts, output_dir, config=None)` - Process existing transcripts
+- `get_available_styles()` - List available processing styles
+- `cancel_operations()` - Cancel ongoing operations
+
+### Convenience Functions
+
+#### `process_youtube_playlist()`
+
+Quick function for simple processing:
+
+```python
+files = process_youtube_playlist(
+    url="youtube_url",
+    output_dir="output_directory",
+    openai_api_key="your_key",
+    styles=["Summary"],  # Optional
+    start_index=1,       # Optional
+    end_index=0,         # Optional (0 = all)
+    output_language="English"  # Optional
+)
+```
+
+#### `extract_transcripts_only()`
+
+Extract transcripts without AI processing:
+
+```python
+transcripts = extract_transcripts_only(
+    url="youtube_url",
+    openai_api_key="your_key",
+    use_ai_fallback=True
+)
+```
+
+## Error Handling
+
+```python
+from getoutvideo import GetOutVideoAPI, GetOutVideoError
+
+try:
+    api = GetOutVideoAPI(openai_api_key="your-key")
+    files = api.process_youtube_url(url, output_dir)
+except GetOutVideoError as e:
+    print(f"API Error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## Examples
+
+Check out the `examples/` directory for comprehensive usage examples:
+
+- `examples/basic_usage.py` - Simple examples for getting started
+- `examples/advanced_usage.py` - Advanced features and configurations
+
+## Configuration Options
+
+### Transcript Configuration
+
+- `start_index`: Starting video index for playlists (1-based)
+- `end_index`: Ending video index (0 = process all)
+- `use_ai_fallback`: Use OpenAI transcription when YouTube transcripts unavailable
+- `cookie_path`: Path to browser cookies for restricted content
+- `cleanup_temp_files`: Remove temporary audio files after processing
+
+### Processing Configuration
+
+- `styles`: List of processing styles to apply
+- `chunk_size`: Maximum words per API call (default: 70,000)
+- `output_language`: Target language for output
+- `max_concurrent_requests`: Limit concurrent API calls
+
+## Output Formats
+
+GetOutVideo generates markdown files with the following naming pattern:
+```
+{video_title} [{style_name}].md
+```
+
+Each file includes:
+- Video title as H1 header
+- Original video URL
+- AI-processed content in the specified style
+
+## Rate Limiting and Costs
+
+- The library respects OpenAI's rate limits
+- Processing costs depend on transcript length and selected models
+- Use smaller `chunk_size` values to reduce per-request costs
+- Consider using specific `styles` instead of processing all styles
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite: `pytest`
+6. Submit a pull request
+
+## Development
+
+### Setting up the development environment
+
+```bash
+git clone https://github.com/yourusername/getoutvideo.git
+cd getoutvideo
+pip install -e ".[dev]"
+```
+
+### Running tests
+
+```bash
+pytest tests/
+```
+
+### Code formatting
+
+```bash
+black getoutvideo/
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Changelog
+
+### Version 1.0.0
+
+- Initial release
+- YouTube transcript extraction
+- OpenAI GPT processing
+- Multiple processing styles
+- Playlist support
+- Audio transcription fallback
+- Comprehensive API interface
+
+## Support
+
+- **Documentation**: [https://getoutvideo.readthedocs.io](https://getoutvideo.readthedocs.io)
+- **Issues**: [GitHub Issues](https://github.com/yourusername/getoutvideo/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yourusername/getoutvideo/discussions)
+
+## Acknowledgments
+
+- OpenAI for GPT models and transcription services
+- YouTube Transcript API contributors
+- PyTube and related YouTube access libraries
+- FFmpeg for audio processing capabilities

@@ -1,22 +1,22 @@
 """
-WatchYTPL4Me API - YouTube Playlist to Text Transformation
+GetOutVideo API - YouTube Playlist to Text Transformation
 
-This module provides a clean, programmatic interface to the core functionality
-of WatchYTPL4Me, allowing you to extract and process YouTube video transcripts
-in other projects without the GUI dependencies.
+This module provides a clean, programmatic interface to extract and process 
+YouTube video transcripts with AI, allowing you to integrate this functionality
+into other projects without GUI dependencies.
 
 Main Classes:
-- WatchYTPL4MeAPI: High-level API interface
+- GetOutVideoAPI: High-level API interface
 - TranscriptExtractor: Direct transcript extraction
 - AIProcessor: AI-powered text processing
 
 Quick Usage:
-    from api import process_youtube_playlist
+    from getoutvideo import process_youtube_playlist
     
     files = process_youtube_playlist(
         "https://www.youtube.com/playlist?list=...",
         "/output/dir",
-        "your-gemini-api-key"
+        "your-openai-api-key"
     )
 """
 
@@ -28,15 +28,15 @@ from .models import VideoTranscript, ProcessingResult
 from .transcript_extractor import TranscriptExtractor
 from .ai_processor import AIProcessor
 from .prompts import get_available_styles
-from .exceptions import WatchYTPLError, ConfigurationError, TranscriptExtractionError, AIProcessingError
+from .exceptions import GetOutVideoError, ConfigurationError, TranscriptExtractionError, AIProcessingError
 from . import config_urls
 
 # Version info
 __version__ = "1.0.0"
-__author__ = "WatchYTPL4Me API"
+__author__ = "GetOutVideo API"
 
 
-class WatchYTPL4MeAPI:
+class GetOutVideoAPI:
     """
     Main API class providing both simple and advanced interfaces.
     
@@ -87,7 +87,7 @@ class WatchYTPL4MeAPI:
             List[str]: Paths to generated output files
             
         Raises:
-            WatchYTPLError: If processing fails
+            GetOutVideoError: If processing fails
         """
         print(f"DEBUG: process_youtube_url called with:")
         print(f"  URL: {url}")
@@ -228,7 +228,7 @@ def process_youtube_playlist(url: str,
         List[str]: Paths to generated output files
         
     Raises:
-        WatchYTPLError: If processing fails
+        GetOutVideoError: If processing fails
     """
     print(f"DEBUG: process_youtube_playlist called with:")
     print(f"  URL: {url}")
@@ -237,8 +237,8 @@ def process_youtube_playlist(url: str,
     print(f"  Styles: {styles}")
     print(f"  Use AI fallback: {use_ai_fallback}")
     
-    print(f"DEBUG: Creating WatchYTPL4MeAPI instance...")
-    api = WatchYTPL4MeAPI(openai_api_key, gemini_api_key)
+    print(f"DEBUG: Creating GetOutVideoAPI instance...")
+    api = GetOutVideoAPI(openai_api_key, gemini_api_key)
     
     # Enable AI fallback if requested and OpenAI key is available
     if use_ai_fallback and openai_api_key:
@@ -287,11 +287,11 @@ def extract_transcripts_only(url: str,
         use_ai_fallback=use_ai_fallback
     )
     
-    api = WatchYTPL4MeAPI(openai_api_key, gemini_api_key)
+    api = GetOutVideoAPI(openai_api_key, gemini_api_key)
     return api.extract_transcripts(url, config)
 
 
-def load_api_from_env() -> WatchYTPL4MeAPI:
+def load_api_from_env() -> GetOutVideoAPI:
     """
     Load API configuration from environment variables.
     
@@ -299,14 +299,14 @@ def load_api_from_env() -> WatchYTPL4MeAPI:
     environment variables.
     
     Returns:
-        WatchYTPL4MeAPI: Configured API instance
+        GetOutVideoAPI: Configured API instance
         
     Raises:
         ConfigurationError: If required environment variables are missing
     """
     try:
         config = load_config_from_env()
-        api = WatchYTPL4MeAPI(config.openai_api_key, config.gemini_api_key)
+        api = GetOutVideoAPI(config.openai_api_key, config.gemini_api_key)
         api.config = config  # Use the full config with language settings
         return api
     except Exception as e:
@@ -316,7 +316,7 @@ def load_api_from_env() -> WatchYTPL4MeAPI:
 # Export main classes and functions
 __all__ = [
     # Main classes
-    'WatchYTPL4MeAPI',
+    'GetOutVideoAPI',
     'TranscriptExtractor',
     'AIProcessor',
     
@@ -337,7 +337,7 @@ __all__ = [
     'get_available_styles',
     
     # Exceptions
-    'WatchYTPLError',
+    'GetOutVideoError',
     'ConfigurationError',
     'TranscriptExtractionError',
     'AIProcessingError'

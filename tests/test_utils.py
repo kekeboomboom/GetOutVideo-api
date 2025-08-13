@@ -3,7 +3,7 @@ Tests for utility functions.
 """
 
 import pytest
-from api.utils import sanitize_filename, split_text_into_chunks
+from getoutvideo.utils import sanitize_filename, split_text_into_chunks
 
 
 class TestSanitizeFilename:

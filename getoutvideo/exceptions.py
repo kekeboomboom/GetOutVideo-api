@@ -1,27 +1,27 @@
 """
-Custom exceptions for the WatchYTPL4Me API.
+Custom exceptions for the GetOutVideo API.
 
 This module defines API-specific exceptions that provide better error
 handling and debugging information compared to generic exceptions.
 """
 
 
-class WatchYTPLError(Exception):
-    """Base exception for all WatchYTPL4Me API errors."""
+class GetOutVideoError(Exception):
+    """Base exception for all GetOutVideo API errors."""
     pass
 
 
-class ConfigurationError(WatchYTPLError):
+class ConfigurationError(GetOutVideoError):
     """Raised when there's an issue with API configuration."""
     pass
 
 
-class TranscriptExtractionError(WatchYTPLError):
+class TranscriptExtractionError(GetOutVideoError):
     """Raised when transcript extraction fails."""
     pass
 
 
-class AIProcessingError(WatchYTPLError):
+class AIProcessingError(GetOutVideoError):
     """Raised when AI processing fails."""
     pass
 
@@ -46,6 +46,6 @@ class OpenAIAPIError(AIProcessingError):
     pass
 
 
-class FileOperationError(WatchYTPLError):
+class FileOperationError(GetOutVideoError):
     """Raised when file operations fail."""
     pass

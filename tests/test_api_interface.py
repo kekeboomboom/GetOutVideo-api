@@ -4,19 +4,19 @@ Tests for the main API interface.
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from api import WatchYTPL4MeAPI, process_youtube_playlist, extract_transcripts_only
-from api.config import APIConfig, TranscriptConfig, ProcessingConfig
-from api.models import VideoTranscript, ProcessingResult
-from api.exceptions import ConfigurationError
-from api.config_urls import UNIT_TEST_URL
+from getoutvideo import GetOutVideoAPI, process_youtube_playlist, extract_transcripts_only
+from getoutvideo.config import APIConfig, TranscriptConfig, ProcessingConfig
+from getoutvideo.models import VideoTranscript, ProcessingResult
+from getoutvideo.exceptions import ConfigurationError
+from getoutvideo.config_urls import UNIT_TEST_URL
 
 
-class TestWatchYTPL4MeAPI:
+class TestGetOutVideoAPI:
     """Test the main API interface."""
     
     def test_initialization(self):
         """Test API initialization."""
-        api = WatchYTPL4MeAPI("test-key")
+        api = GetOutVideoAPI("test-key")
         
         assert api.config.gemini_api_key == "test-key"
         assert api.transcript_extractor is not None
@@ -24,7 +24,7 @@ class TestWatchYTPL4MeAPI:
     
     def test_initialization_with_openai(self):
         """Test API initialization with OpenAI key."""
-        api = WatchYTPL4MeAPI("test-key", "openai-key")
+        api = GetOutVideoAPI("test-key", "openai-key")
         
         assert api.config.gemini_api_key == "test-key"
         assert api.config.openai_api_key == "openai-key"
@@ -52,7 +52,7 @@ class TestWatchYTPL4MeAPI:
         mock_ai_process.return_value = [mock_result]
         
         # Test the API
-        api = WatchYTPL4MeAPI("test-key", "openai-key")
+        api = GetOutVideoAPI("test-key", "openai-key")
         result = api.process_youtube_url(
             UNIT_TEST_URL,
             "/output",
@@ -74,7 +74,7 @@ class TestWatchYTPL4MeAPI:
         )
         mock_extract.return_value = [mock_transcript]
         
-        api = WatchYTPL4MeAPI("test-key", "openai-key")
+        api = GetOutVideoAPI("test-key", "openai-key")
         result = api.extract_transcripts(UNIT_TEST_URL)
         
         assert len(result) == 1
@@ -83,7 +83,7 @@ class TestWatchYTPL4MeAPI:
     
     def test_get_available_styles(self):
         """Test getting available styles."""
-        api = WatchYTPL4MeAPI("test-key")
+        api = GetOutVideoAPI("test-key")
         styles = api.get_available_styles()
         
         assert isinstance(styles, list)
