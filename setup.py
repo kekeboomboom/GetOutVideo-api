@@ -18,11 +18,11 @@ setup(
     name="getoutvideo",
     version="1.0.0",
     author="GetOutVideo API",
-    author_email="contact@example.com",
+    author_email="keboom.dev@gmail.com",
     description="Extract and process YouTube video transcripts with AI",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/getoutvideo",
+    url="https://github.com/keboom/GetOutVideo-api",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -54,7 +54,7 @@ setup(
     keywords="youtube transcript ai openai video-processing gpt",
     project_urls={
         "Documentation": "https://getoutvideo.readthedocs.io",
-        "Bug Reports": "https://github.com/yourusername/getoutvideo/issues",
-        "Source": "https://github.com/yourusername/getoutvideo",
+        "Bug Reports": "https://github.com/keboom/GetOutVideo-api/issues",
+        "Source": "https://github.com/keboom/GetOutVideo-api",
     },
 )

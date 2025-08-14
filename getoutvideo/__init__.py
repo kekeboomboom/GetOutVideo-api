@@ -291,6 +291,51 @@ def extract_transcripts_only(url: str,
     return api.extract_transcripts(url, config)
 
 
+def process_youtube_video(url: str,
+                         output_dir: str,
+                         openai_api_key: str,
+                         styles: Optional[List[str]] = None,
+                         gemini_api_key: Optional[str] = None,
+                         start_index: int = 1,
+                         end_index: int = 0,
+                         output_language: str = "English",
+                         use_ai_fallback: bool = True) -> List[str]:
+    """
+    Process a single YouTube video or playlist with AI refinement.
+    
+    This is an alias for process_youtube_playlist with a more intuitive name
+    for single video processing (which is the primary use case).
+    
+    Args:
+        url: YouTube video or playlist URL
+        output_dir: Directory where processed files will be saved
+        openai_api_key: OpenAI API key for text processing
+        styles: List of processing styles (None = all styles)
+        gemini_api_key: Optional Gemini API key for backward compatibility
+        start_index: Starting video index for playlists (1-based)
+        end_index: Ending video index for playlists (0 = process all)
+        output_language: Target language for the output
+        use_ai_fallback: Whether to use AI STT when YouTube transcripts unavailable
+        
+    Returns:
+        List[str]: Paths to generated output files
+        
+    Raises:
+        GetOutVideoError: If processing fails
+    """
+    return process_youtube_playlist(
+        url=url,
+        output_dir=output_dir,
+        openai_api_key=openai_api_key,
+        styles=styles,
+        gemini_api_key=gemini_api_key,
+        start_index=start_index,
+        end_index=end_index,
+        output_language=output_language,
+        use_ai_fallback=use_ai_fallback
+    )
+
+
 def load_api_from_env() -> GetOutVideoAPI:
     """
     Load API configuration from environment variables.
@@ -332,6 +377,7 @@ __all__ = [
     
     # Convenience functions
     'process_youtube_playlist',
+    'process_youtube_video',
     'extract_transcripts_only',
     'load_api_from_env',
     'get_available_styles',

@@ -70,11 +70,11 @@ sudo yum install ffmpeg
 ### Basic Usage
 
 ```python
-from getoutvideo import process_youtube_playlist
+from getoutvideo import process_youtube_video
 
 # Process a single video
-files = process_youtube_playlist(
-    url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+files = process_youtube_video(
+    url="https://www.youtube.com/watch?v=7gp7GkPE-tI",
     output_dir="./output",
     openai_api_key="your-openai-api-key"
 )
@@ -90,11 +90,11 @@ from getoutvideo import GetOutVideoAPI
 
 api = GetOutVideoAPI(openai_api_key="your-openai-api-key")
 
-# Generate only summaries and key points
+# Generate only summaries and educational content
 files = api.process_youtube_url(
     url="https://www.youtube.com/watch?v=VIDEO_ID",
     output_dir="./summaries",
-    styles=["Summary", "Key Points"]
+    styles=["Summary", "Educational"]
 )
 ```
 
@@ -125,10 +125,9 @@ GetOutVideo creates different document types from the same video:
 |-------|----------|---------------|
 | **Summary** | Quick overviews | Concise main points |
 | **Educational** | Learning materials | Structured lessons with examples |
-| **Key Points** | Study notes | Bullet-pointed highlights |
-| **Q&A** | Training materials | Question and answer format |
-| **Technical** | Documentation | Step-by-step instructions |
-| **Balanced** | Comprehensive reports | Full detailed coverage |
+| **Balanced and Detailed** | Comprehensive reports | Full detailed coverage with all information |
+| **Q&A Generation** | Training materials | Question and answer format |
+| **Narrative Rewriting** | Engaging content | Story-like format while maintaining facts |
 
 ```python
 # Get all available styles
@@ -165,7 +164,7 @@ files = process_youtube_playlist(
     url="https://www.youtube.com/watch?v=VIDEO_ID",
     output_dir="./output",
     openai_api_key="your-openai-api-key",
-    styles=["Summary", "Key Points"],  # Optional
+    styles=["Summary", "Educational"],  # Optional
     start_index=1,                     # Optional: playlist start
     end_index=0,                       # Optional: end (0 = all)
     output_language="English"          # Optional
@@ -187,7 +186,7 @@ files = api.process_youtube_url(url, output_dir, styles=["Summary"])
 transcripts = api.extract_transcripts(url)
 
 # Process existing transcripts
-results = api.process_with_ai(transcripts, output_dir, styles=["Technical"])
+results = api.process_with_ai(transcripts, output_dir, styles=["Educational"])
 ```
 
 #### `extract_transcripts_only()`
@@ -211,7 +210,7 @@ study_files = process_youtube_playlist(
     url="https://www.youtube.com/playlist?list=COURSE_PLAYLIST",
     output_dir="./course_materials",
     openai_api_key="your-key",
-    styles=["Educational", "Key Points"]
+    styles=["Educational", "Summary"]
 )
 ```
 
@@ -220,7 +219,7 @@ study_files = process_youtube_playlist(
 # Turn tutorial videos into documentation
 api = GetOutVideoAPI(openai_api_key="your-key")
 transcripts = api.extract_transcripts("https://www.youtube.com/watch?v=TUTORIAL_ID")
-docs = api.process_with_ai(transcripts, "./docs", styles=["Technical"])
+docs = api.process_with_ai(transcripts, "./docs", styles=["Educational"])
 ```
 
 ### Research and Analysis
@@ -246,8 +245,8 @@ Example output for "Python Tutorial":
 📁 output/
 ├── Python_Tutorial [Summary].md
 ├── Python_Tutorial [Educational].md  
-├── Python_Tutorial [Key Points].md
-└── Python_Tutorial [Technical].md
+├── Python_Tutorial [Balanced and Detailed].md
+└── Python_Tutorial [Q&A Generation].md
 ```
 
 Each file contains:

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "getoutvideo"
 version = "1.0.0"
 description = "Extract and process YouTube video transcripts with AI"
-authors = [{name = "GetOutVideo API", email = "contact@example.com"}]
+authors = [{name = "GetOutVideo API", email = "keboom.dev@gmail.com"}]
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.8"
@@ -35,10 +35,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/getoutvideo"
-Documentation = "https://getoutvideo.readthedocs.io"
-Repository = "https://github.com/yourusername/getoutvideo"
-Issues = "https://github.com/yourusername/getoutvideo/issues"
+Homepage = "https://github.com/keboom/GetOutVideo-api"
+Documentation = "https://github.com/keboom/GetOutVideo-api#readme"
+Repository = "https://github.com/keboom/GetOutVideo-api"
+Issues = "https://github.com/keboom/GetOutVideo-api/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "black", "flake8", "mypy", "twine", "build"]
