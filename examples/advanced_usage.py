@@ -61,8 +61,6 @@ def custom_configuration_example():
     
     # Create custom transcript configuration
     transcript_config = TranscriptConfig(
-        start_index=1,
-        end_index=3,
         use_ai_fallback=True,
         cookie_path="./cookies.txt",  # For restricted videos
         cleanup_temp_files=True
@@ -83,7 +81,7 @@ def custom_configuration_example():
     api.config.processing_config = processing_config
     
     output_files = api.process_youtube_url(
-        url="https://www.youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMw6luKi_8LlH4b1vD",
+        url="https://www.youtube.com/watch?v=VIDEO_ID",
         output_dir="./output/custom_config"
     )
     
@@ -100,8 +98,7 @@ def error_handling_example():
     
     test_urls = [
         "https://www.youtube.com/watch?v=valid_video_id",
-        "https://www.youtube.com/watch?v=invalid_video_id",
-        "https://www.youtube.com/playlist?list=invalid_playlist_id"
+        "https://www.youtube.com/watch?v=invalid_video_id"
     ]
     
     for url in test_urls:
@@ -179,12 +176,10 @@ def batch_processing_example():
             "language": "Spanish"
         },
         {
-            "url": "https://www.youtube.com/playlist?list=playlist1",
-            "output_dir": "./output/batch/playlist",
-            "styles": ["Q&A", "Key Points"],
-            "language": "French",
-            "start_index": 1,
-            "end_index": 5
+            "url": "https://www.youtube.com/watch?v=video3",
+            "output_dir": "./output/batch/detailed",
+            "styles": ["Q&A", "Balanced and Detailed"],
+            "language": "French"
         }
     ]
     
@@ -199,9 +194,7 @@ def batch_processing_example():
                 url=job["url"],
                 output_dir=job["output_dir"],
                 styles=job["styles"],
-                output_language=job["language"],
-                start_index=job.get("start_index", 1),
-                end_index=job.get("end_index", 0)
+                output_language=job["language"]
             )
             
             successful_jobs += 1

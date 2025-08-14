@@ -17,7 +17,11 @@ from .utils import safe_progress_callback, safe_status_callback
 
 # Import the AI STT fallback function from the root module
 import sys
-from . import audio_transcriber
+try:
+    from . import audio_transcriber
+except ImportError as e:
+    print(f"Warning: Audio transcriber not available: {e}")
+    audio_transcriber = None
 
 
 class TranscriptExtractor:
@@ -76,18 +80,11 @@ class TranscriptExtractor:
             all_video_urls, playlist_name = self._parse_url(url, status_callback)
             print(f"DEBUG: Parsed URL - found {len(all_video_urls)} video URLs, playlist name: {playlist_name}")
             
-            # Apply range filtering
-            config = self.config.transcript_config
-            slice_start = max(0, config.start_index - 1)
-            slice_end = None if config.end_index == 0 else config.end_index
-            
-            print(f"DEBUG: Range filtering - start_index: {config.start_index}, end_index: {config.end_index}")
-            print(f"DEBUG: Slice parameters - slice_start: {slice_start}, slice_end: {slice_end}")
-            
-            video_urls_to_process = all_video_urls[slice_start:slice_end]
+            # For single video processing, we don't need range filtering
+            video_urls_to_process = all_video_urls
             total_videos = len(video_urls_to_process)
             
-            print(f"DEBUG: After range filtering - {total_videos} videos to process")
+            print(f"DEBUG: Processing {total_videos} video(s)")
             for i, video_url in enumerate(video_urls_to_process):
                 print(f"DEBUG: Video {i+1}: {video_url}")
             
@@ -97,9 +94,7 @@ class TranscriptExtractor:
                 return []
             
             safe_status_callback(status_callback, 
-                               f"Processing {total_videos} videos (range {config.start_index} "
-                               f"to {config.end_index if config.end_index != 0 else 'End'} "
-                               f"of {len(all_video_urls)}).")
+                               f"Processing {total_videos} video(s).")
             
             # Extract transcripts
             transcripts = []
@@ -110,8 +105,7 @@ class TranscriptExtractor:
                 
                 print(f"DEBUG: Processing video {index}/{total_videos}: {video_url}")
                 
-                original_index = slice_start + index
-                transcript = self._extract_single_video(video_url, original_index, index, 
+                transcript = self._extract_single_video(video_url, index, index, 
                                                        total_videos, status_callback)
                 
                 if transcript:
@@ -140,50 +134,35 @@ class TranscriptExtractor:
     
     def _parse_url(self, url: str, status_callback: Optional[Callable[[str], None]] = None) -> tuple[List[str], str]:
         """
-        Parse YouTube URL and extract video URLs and playlist name.
+        Parse YouTube URL and extract video URL and title.
         
         Args:
-            url: YouTube URL
+            url: YouTube video URL
             status_callback: Optional callback for status messages
             
         Returns:
-            tuple: (list of video URLs, playlist/video name)
+            tuple: (list containing single video URL, video title)
             
         Raises:
             YouTubeAccessError: If URL parsing fails
         """
         try:
             if "playlist?list=" in url:
-                # Handle playlist
-                playlist = Playlist(url)
-                try:
-                    all_video_urls = list(playlist.video_urls)
-                    playlist_name = playlist.title
-                    safe_status_callback(status_callback, 
-                                       f"Found playlist: {playlist_name} with {len(all_video_urls)} videos.")
-                    return all_video_urls, playlist_name
-                    
-                except KeyError as ke:
-                    error_msg = (f"Extraction error (Accessing Playlist Details): {str(ke)}. "
-                               "YouTube structure likely changed. Update pytubefix or check issues.")
-                    raise YouTubeAccessError(error_msg) from ke
-                except Exception as e:
-                    error_msg = f"Extraction error (Accessing Playlist Properties): {str(e)}. URL: {url}"
-                    raise YouTubeAccessError(error_msg) from e
+                raise YouTubeAccessError(f"Playlist URLs are not supported. Please use individual video URLs.")
                     
             elif "watch?v=" in url:
                 # Handle single video
                 try:
                     yt = YouTube(url)
-                    playlist_name = yt.title
-                    safe_status_callback(status_callback, f"Processing single video: {playlist_name}")
-                    return [url], playlist_name
+                    video_title = yt.title
+                    safe_status_callback(status_callback, f"Processing single video: {video_title}")
+                    return [url], video_title
                 except Exception as e:
                     safe_status_callback(status_callback, 
                                        f"Processing single video (Could not get title: {str(e)}). URL: {url}")
                     return [url], "Single Video"
             else:
-                raise YouTubeAccessError(f"Invalid URL format: {url}")
+                raise YouTubeAccessError(f"Invalid URL format. Only single video URLs are supported: {url}")
                 
         except YouTubeAccessError:
             raise
@@ -252,7 +231,7 @@ class TranscriptExtractor:
                 print(f"DEBUG: OpenAI key available: {'Yes' if self.config.openai_api_key else 'No'}")
                 
                 # Fallback to AI STT if enabled and OpenAI key available
-                if self.config.transcript_config.use_ai_fallback and self.config.openai_api_key:
+                if self.config.transcript_config.use_ai_fallback and self.config.openai_api_key and audio_transcriber:
                     safe_status_callback(status_callback,
                                        f"Standard transcript unavailable for video {current_index}/{total_videos} "
                                        f"({type(e).__name__}). Attempting AI STT fallback...")
@@ -286,10 +265,16 @@ class TranscriptExtractor:
                                            f"Error during AI STT fallback for video {current_index}/{total_videos}: {str(ai_e)}")
                         raise AudioProcessingError(f"AI STT fallback failed: {str(ai_e)}") from ai_e
                 else:
-                    print(f"DEBUG: AI fallback not attempted (disabled or no OpenAI key)")
-                    safe_status_callback(status_callback,
-                                       f"Standard transcript unavailable for video {current_index}/{total_videos} "
-                                       f"and AI fallback is disabled or OpenAI key not provided.")
+                    if not audio_transcriber:
+                        print(f"DEBUG: AI fallback not attempted (audio transcriber not available)")
+                        safe_status_callback(status_callback,
+                                           f"Standard transcript unavailable for video {current_index}/{total_videos} "
+                                           f"and AI fallback is not available due to missing dependencies.")
+                    else:
+                        print(f"DEBUG: AI fallback not attempted (disabled or no OpenAI key)")
+                        safe_status_callback(status_callback,
+                                           f"Standard transcript unavailable for video {current_index}/{total_videos} "
+                                           f"and AI fallback is disabled or OpenAI key not provided.")
                     
             except Exception as e:
                 print(f"DEBUG: Unexpected error during transcript extraction: {type(e).__name__}: {str(e)}")

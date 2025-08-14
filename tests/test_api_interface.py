@@ -4,7 +4,7 @@ Tests for the main API interface.
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from getoutvideo import GetOutVideoAPI, process_youtube_playlist, extract_transcripts_only
+from getoutvideo import GetOutVideoAPI, process_youtube_video, extract_transcripts_only
 from getoutvideo.config import APIConfig, TranscriptConfig, ProcessingConfig
 from getoutvideo.models import VideoTranscript, ProcessingResult
 from getoutvideo.exceptions import ConfigurationError
@@ -18,19 +18,19 @@ class TestGetOutVideoAPI:
         """Test API initialization."""
         api = GetOutVideoAPI("test-key")
         
-        assert api.config.gemini_api_key == "test-key"
+        assert api.config.openai_api_key == "test-key"
         assert api.transcript_extractor is not None
         assert api.ai_processor is not None
     
-    def test_initialization_with_openai(self):
-        """Test API initialization with OpenAI key."""
-        api = GetOutVideoAPI("test-key", "openai-key")
+    def test_initialization_with_gemini(self):
+        """Test API initialization with Gemini key."""
+        api = GetOutVideoAPI("openai-key", "gemini-key")
         
-        assert api.config.gemini_api_key == "test-key"
         assert api.config.openai_api_key == "openai-key"
+        assert api.config.gemini_api_key == "gemini-key"
     
-    @patch('api.transcript_extractor.TranscriptExtractor.extract_transcripts')
-    @patch('api.ai_processor.AIProcessor.process_transcripts')
+    @patch('getoutvideo.transcript_extractor.TranscriptExtractor.extract_transcripts')
+    @patch('getoutvideo.ai_processor.AIProcessor.process_transcripts')
     def test_process_youtube_url(self, mock_ai_process, mock_extract):
         """Test the simple process_youtube_url interface."""
         # Setup mocks
@@ -52,7 +52,7 @@ class TestGetOutVideoAPI:
         mock_ai_process.return_value = [mock_result]
         
         # Test the API
-        api = GetOutVideoAPI("test-key", "openai-key")
+        api = GetOutVideoAPI("openai-key", "gemini-key")
         result = api.process_youtube_url(
             UNIT_TEST_URL,
             "/output",
@@ -63,7 +63,7 @@ class TestGetOutVideoAPI:
         mock_extract.assert_called_once()
         mock_ai_process.assert_called_once()
     
-    @patch('api.transcript_extractor.TranscriptExtractor.extract_transcripts')
+    @patch('getoutvideo.transcript_extractor.TranscriptExtractor.extract_transcripts')
     def test_extract_transcripts_only(self, mock_extract):
         """Test transcript extraction only."""
         mock_transcript = VideoTranscript(
@@ -74,7 +74,7 @@ class TestGetOutVideoAPI:
         )
         mock_extract.return_value = [mock_transcript]
         
-        api = GetOutVideoAPI("test-key", "openai-key")
+        api = GetOutVideoAPI("openai-key", "gemini-key")
         result = api.extract_transcripts(UNIT_TEST_URL)
         
         assert len(result) == 1
@@ -94,22 +94,22 @@ class TestGetOutVideoAPI:
 class TestConvenienceFunctions:
     """Test the convenience functions."""
     
-    @patch('api.WatchYTPL4MeAPI.process_youtube_url')
-    def test_process_youtube_playlist(self, mock_process):
-        """Test the convenience playlist processing function."""
-        mock_process.return_value = ["/output/file1.md", "/output/file2.md"]
+    @patch('getoutvideo.GetOutVideoAPI.process_youtube_url')
+    def test_process_youtube_video(self, mock_process):
+        """Test the convenience video processing function."""
+        mock_process.return_value = ["/output/file1.md"]
         
-        result = process_youtube_playlist(
-            "https://youtube.com/playlist?list=test",
+        result = process_youtube_video(
+            "https://youtube.com/watch?v=test",
             "/output",
             "test-key",
             styles=["Summary"]
         )
         
-        assert result == ["/output/file1.md", "/output/file2.md"]
+        assert result == ["/output/file1.md"]
         mock_process.assert_called_once()
     
-    @patch('api.WatchYTPL4MeAPI.extract_transcripts')
+    @patch('getoutvideo.GetOutVideoAPI.extract_transcripts')
     def test_extract_transcripts_only_function(self, mock_extract):
         """Test the convenience transcript extraction function."""
         mock_transcript = VideoTranscript(
@@ -122,8 +122,7 @@ class TestConvenienceFunctions:
         
         result = extract_transcripts_only(
             UNIT_TEST_URL,
-            "test-key",
-            "openai-key"
+            "test-key"
         )
         
         assert len(result) == 1
@@ -134,14 +133,14 @@ class TestConvenienceFunctions:
 class TestEnvironmentLoading:
     """Test environment variable loading."""
     
-    @patch.dict('os.environ', {'GEMINI_API_KEY': 'env-gemini-key', 'OPENAI_API_KEY': 'env-openai-key'})
-    @patch('api.load_api_from_env')
+    @patch.dict('os.environ', {'OPENAI_API_KEY': 'env-openai-key'})
+    @patch('getoutvideo.load_api_from_env')
     def test_load_from_env_success(self, mock_load):
         """Test successful loading from environment."""
         mock_api = MagicMock()
         mock_load.return_value = mock_api
         
-        from api import load_api_from_env
+        from getoutvideo import load_api_from_env
         result = load_api_from_env()
         
         assert result == mock_api
@@ -149,7 +148,7 @@ class TestEnvironmentLoading:
     @patch.dict('os.environ', {}, clear=True)
     def test_load_from_env_missing_keys(self):
         """Test loading from environment with missing keys."""
-        from api import load_api_from_env
+        from getoutvideo import load_api_from_env
         
         with pytest.raises(ConfigurationError):
             load_api_from_env()

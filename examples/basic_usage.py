@@ -7,7 +7,11 @@ processing YouTube video transcripts.
 """
 
 import os
-from getoutvideo import GetOutVideoAPI, process_youtube_playlist
+from dotenv import load_dotenv
+from getoutvideo import GetOutVideoAPI, process_youtube_video
+
+# Load environment variables from .env file
+load_dotenv()
 
 def basic_single_video_example():
     """
@@ -15,12 +19,12 @@ def basic_single_video_example():
     """
     print("=== Example 1: Basic Single Video Processing ===")
     
-    # Initialize the API with your OpenAI API key
-    api = GetOutVideoAPI(openai_api_key="your-openai-api-key-here")
+    # Initialize the API with OpenAI API key from environment
+    api = GetOutVideoAPI(openai_api_key=os.getenv("OPENAI_API_KEY"))
     
     # Process a single video with default settings (all styles)
     output_files = api.process_youtube_url(
-        url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        url="https://www.youtube.com/watch?v=7gp7GkPE-tI",
         output_dir="./output"
     )
     
@@ -36,10 +40,10 @@ def convenience_function_example():
     print("=== Example 2: Using Convenience Function ===")
     
     # One-line processing with convenience function
-    output_files = process_youtube_playlist(
+    output_files = process_youtube_video(
         url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         output_dir="./output",
-        openai_api_key="your-openai-api-key-here",
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
         styles=["Summary", "Educational"],  # Only specific styles
         output_language="English"
     )
@@ -49,26 +53,24 @@ def convenience_function_example():
         print(f"  - {file_path}")
 
 
-def playlist_example():
+def custom_processing_example():
     """
-    Example 3: Process a YouTube playlist with specific video range.
+    Example 3: Process a YouTube video with custom settings.
     """
-    print("=== Example 3: Playlist Processing with Range ===")
+    print("=== Example 3: Custom Processing Settings ===")
     
-    api = GetOutVideoAPI(openai_api_key="your-openai-api-key-here")
+    api = GetOutVideoAPI(openai_api_key=os.getenv("OPENAI_API_KEY"))
     
-    # Process videos 2-5 from a playlist
+    # Process video with custom settings
     output_files = api.process_youtube_url(
-        url="https://www.youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMw6luKi_8LlH4b1vD",
-        output_dir="./output/playlist",
-        start_index=2,
-        end_index=5,
+        url="https://www.youtube.com/watch?v=VIDEO_ID",
+        output_dir="./output/custom",
         styles=["Summary"],
         chunk_size=50000,  # Smaller chunks for faster processing
         output_language="Spanish"
     )
     
-    print(f"Generated {len(output_files)} files from playlist videos 2-5")
+    print(f"Generated {len(output_files)} files with custom settings")
 
 
 def environment_config_example():
@@ -103,7 +105,7 @@ if __name__ == "__main__":
     Run examples (commented out to prevent accidental API usage).
     
     Uncomment the examples you want to run and make sure to:
-    1. Replace 'your-openai-api-key-here' with your actual API key
+    1. Create a .env file with OPENAI_API_KEY=your-actual-api-key
     2. Set up proper output directories
     3. Use valid YouTube URLs
     """
@@ -111,14 +113,14 @@ if __name__ == "__main__":
     print("GetOutVideo API Examples")
     print("=" * 50)
     print("NOTE: Examples are commented out to prevent accidental API usage.")
-    print("Uncomment and modify the examples below with your API key and URLs.")
+    print("Uncomment the examples below and create a .env file with your API key.")
     print()
     
     # Uncomment to run examples:
-    # basic_single_video_example()
+    basic_single_video_example()
     # print()
     # convenience_function_example()
     # print()
-    # playlist_example()
+    # custom_processing_example()
     # print()
     # environment_config_example()

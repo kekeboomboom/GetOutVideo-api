@@ -1,5 +1,5 @@
 """
-GetOutVideo API - YouTube Playlist to Text Transformation
+GetOutVideo API - YouTube Video to Text Transformation
 
 This module provides a clean, programmatic interface to extract and process 
 YouTube video transcripts with AI, allowing you to integrate this functionality
@@ -11,10 +11,10 @@ Main Classes:
 - AIProcessor: AI-powered text processing
 
 Quick Usage:
-    from getoutvideo import process_youtube_playlist
+    from getoutvideo import process_youtube_video
     
-    files = process_youtube_playlist(
-        "https://www.youtube.com/playlist?list=...",
+    files = process_youtube_video(
+        "https://www.youtube.com/watch?v=VIDEO_ID",
         "/output/dir",
         "your-openai-api-key"
     )
@@ -64,8 +64,6 @@ class GetOutVideoAPI:
                           url: str,
                           output_dir: str,
                           styles: Optional[List[str]] = None,
-                          start_index: int = 1,
-                          end_index: int = 0,
                           chunk_size: int = 70000,
                           output_language: str = "English") -> List[str]:
         """
@@ -75,11 +73,9 @@ class GetOutVideoAPI:
         and processes them with AI in a single operation.
         
         Args:
-            url: YouTube playlist or video URL
+            url: YouTube video URL
             output_dir: Directory where processed files will be saved
             styles: List of processing styles to use (None = all styles)
-            start_index: Starting video index for playlists (1-based)
-            end_index: Ending video index for playlists (0 = process all)
             chunk_size: Maximum words per API call
             output_language: Target language for the output
             
@@ -93,14 +89,10 @@ class GetOutVideoAPI:
         print(f"  URL: {url}")
         print(f"  Output dir: {output_dir}")
         print(f"  Styles: {styles}")
-        print(f"  Start index: {start_index}")
-        print(f"  End index: {end_index}")
         print(f"  Chunk size: {chunk_size}")
         print(f"  Output language: {output_language}")
         
         # Update configuration
-        self.config.transcript_config.start_index = start_index
-        self.config.transcript_config.end_index = end_index
         self.config.processing_config.chunk_size = chunk_size
         self.config.processing_config.output_language = output_language
         self.config.processing_config.styles = styles
@@ -141,7 +133,7 @@ class GetOutVideoAPI:
         or analyze transcripts before processing.
         
         Args:
-            url: YouTube playlist or video URL
+            url: YouTube video URL
             config: Optional transcript configuration (uses API default if None)
             
         Returns:
@@ -198,29 +190,54 @@ class GetOutVideoAPI:
 
 # Convenience Functions
 
-def process_youtube_playlist(url: str,
-                           output_dir: str,
+
+
+def extract_transcripts_only(url: str,
                            openai_api_key: str,
-                           styles: Optional[List[str]] = None,
                            gemini_api_key: Optional[str] = None,
-                           start_index: int = 1,
-                           end_index: int = 0,
-                           output_language: str = "English",
-                           use_ai_fallback: bool = True) -> List[str]:
+                           use_ai_fallback: bool = True) -> List[VideoTranscript]:
     """
-    Quick function to process YouTube content with minimal setup.
-    
-    This function provides a one-line solution for processing YouTube
-    content with sensible defaults.
+    Extract transcripts only without AI processing.
     
     Args:
-        url: YouTube playlist or video URL
+        url: YouTube video URL
+        openai_api_key: OpenAI API key (required for API initialization)
+        gemini_api_key: Optional Gemini API key for backward compatibility
+        use_ai_fallback: Whether to use AI STT when YouTube transcripts unavailable
+        
+    Returns:
+        List[VideoTranscript]: Extracted video transcripts
+        
+    Raises:
+        TranscriptExtractionError: If extraction fails
+    """
+    config = TranscriptConfig(
+        use_ai_fallback=use_ai_fallback
+    )
+    
+    api = GetOutVideoAPI(openai_api_key, gemini_api_key)
+    return api.extract_transcripts(url, config)
+
+
+def process_youtube_video(url: str,
+                         output_dir: str,
+                         openai_api_key: str,
+                         styles: Optional[List[str]] = None,
+                         gemini_api_key: Optional[str] = None,
+                         output_language: str = "English",
+                         use_ai_fallback: bool = True) -> List[str]:
+    """
+    Process a single YouTube video with AI refinement.
+    
+    This is the main function for processing single YouTube videos
+    with sensible defaults.
+    
+    Args:
+        url: YouTube video URL
         output_dir: Directory where processed files will be saved
         openai_api_key: OpenAI API key for text processing
         styles: List of processing styles (None = all styles)
         gemini_api_key: Optional Gemini API key for backward compatibility
-        start_index: Starting video index for playlists (1-based)
-        end_index: Ending video index for playlists (0 = process all)
         output_language: Target language for the output
         use_ai_fallback: Whether to use AI STT when YouTube transcripts unavailable
         
@@ -230,7 +247,7 @@ def process_youtube_playlist(url: str,
     Raises:
         GetOutVideoError: If processing fails
     """
-    print(f"DEBUG: process_youtube_playlist called with:")
+    print(f"DEBUG: process_youtube_video called with:")
     print(f"  URL: {url}")
     print(f"  OpenAI API key: {'SET' if openai_api_key else 'NOT SET'}")
     print(f"  Gemini API key: {'SET' if gemini_api_key else 'NOT SET'}")
@@ -250,90 +267,12 @@ def process_youtube_playlist(url: str,
     print(f"DEBUG: API instance created, calling process_youtube_url...")
     
     result = api.process_youtube_url(
-        url, output_dir, styles, start_index, end_index,
+        url, output_dir, styles,
         output_language=output_language
     )
     
-    print(f"DEBUG: process_youtube_playlist returning {len(result)} files")
+    print(f"DEBUG: process_youtube_video returning {len(result)} files")
     return result
-
-
-def extract_transcripts_only(url: str,
-                           openai_api_key: str,
-                           gemini_api_key: Optional[str] = None,
-                           start_index: int = 1,
-                           end_index: int = 0,
-                           use_ai_fallback: bool = True) -> List[VideoTranscript]:
-    """
-    Extract transcripts only without AI processing.
-    
-    Args:
-        url: YouTube playlist or video URL
-        openai_api_key: OpenAI API key (required for API initialization)
-        gemini_api_key: Optional Gemini API key for backward compatibility
-        start_index: Starting video index for playlists (1-based)
-        end_index: Ending video index for playlists (0 = process all)
-        use_ai_fallback: Whether to use AI STT when YouTube transcripts unavailable
-        
-    Returns:
-        List[VideoTranscript]: Extracted video transcripts
-        
-    Raises:
-        TranscriptExtractionError: If extraction fails
-    """
-    config = TranscriptConfig(
-        start_index=start_index,
-        end_index=end_index,
-        use_ai_fallback=use_ai_fallback
-    )
-    
-    api = GetOutVideoAPI(openai_api_key, gemini_api_key)
-    return api.extract_transcripts(url, config)
-
-
-def process_youtube_video(url: str,
-                         output_dir: str,
-                         openai_api_key: str,
-                         styles: Optional[List[str]] = None,
-                         gemini_api_key: Optional[str] = None,
-                         start_index: int = 1,
-                         end_index: int = 0,
-                         output_language: str = "English",
-                         use_ai_fallback: bool = True) -> List[str]:
-    """
-    Process a single YouTube video or playlist with AI refinement.
-    
-    This is an alias for process_youtube_playlist with a more intuitive name
-    for single video processing (which is the primary use case).
-    
-    Args:
-        url: YouTube video or playlist URL
-        output_dir: Directory where processed files will be saved
-        openai_api_key: OpenAI API key for text processing
-        styles: List of processing styles (None = all styles)
-        gemini_api_key: Optional Gemini API key for backward compatibility
-        start_index: Starting video index for playlists (1-based)
-        end_index: Ending video index for playlists (0 = process all)
-        output_language: Target language for the output
-        use_ai_fallback: Whether to use AI STT when YouTube transcripts unavailable
-        
-    Returns:
-        List[str]: Paths to generated output files
-        
-    Raises:
-        GetOutVideoError: If processing fails
-    """
-    return process_youtube_playlist(
-        url=url,
-        output_dir=output_dir,
-        openai_api_key=openai_api_key,
-        styles=styles,
-        gemini_api_key=gemini_api_key,
-        start_index=start_index,
-        end_index=end_index,
-        output_language=output_language,
-        use_ai_fallback=use_ai_fallback
-    )
 
 
 def load_api_from_env() -> GetOutVideoAPI:
@@ -376,7 +315,6 @@ __all__ = [
     'ProcessingResult',
     
     # Convenience functions
-    'process_youtube_playlist',
     'process_youtube_video',
     'extract_transcripts_only',
     'load_api_from_env',

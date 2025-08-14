@@ -6,7 +6,7 @@ GetOutVideo is a Python API that converts YouTube videos into structured, readab
 
 ## What it does
 
-Turn any YouTube video or playlist into:
+Turn any YouTube video into:
 - **Summaries** - Quick overviews and key points
 - **Educational materials** - Structured lessons and tutorials  
 - **Documentation** - Technical guides and how-tos
@@ -21,12 +21,11 @@ Perfect for students, researchers, content creators, and professionals who want 
 
 ## Features
 
-- **YouTube Integration**: Extract transcripts from individual videos or entire playlists
+- **YouTube Integration**: Extract transcripts from individual videos
 - **AI Processing**: Transform raw transcripts using OpenAI's GPT models
 - **Multiple Styles**: Generate summaries, educational content, Q&A, key points, and more
 - **Flexible Configuration**: Customize processing parameters, languages, and output formats
 - **Fallback Transcription**: Uses OpenAI's audio transcription when YouTube transcripts aren't available
-- **Batch Processing**: Handle multiple videos efficiently
 - **Clean API**: Simple interface for both basic and advanced use cases
 
 ## Installation
@@ -98,18 +97,6 @@ files = api.process_youtube_url(
 )
 ```
 
-### Process Playlists
-
-```python
-# Process entire playlist
-files = process_youtube_playlist(
-    url="https://www.youtube.com/playlist?list=PLAYLIST_ID",
-    output_dir="./course_materials",
-    openai_api_key="your-openai-api-key",
-    start_index=1,    # First video
-    end_index=5       # Stop after 5 videos (0 = all)
-)
-```
 
 ## How It Works
 
@@ -154,19 +141,17 @@ api = load_api_from_env()  # Uses environment variables
 
 ### Main Functions
 
-#### `process_youtube_playlist()`
-One-line processing for videos and playlists:
+#### `process_youtube_video()`
+One-line processing for videos:
 
 ```python
-from getoutvideo import process_youtube_playlist
+from getoutvideo import process_youtube_video
 
-files = process_youtube_playlist(
+files = process_youtube_video(
     url="https://www.youtube.com/watch?v=VIDEO_ID",
     output_dir="./output",
     openai_api_key="your-openai-api-key",
     styles=["Summary", "Educational"],  # Optional
-    start_index=1,                     # Optional: playlist start
-    end_index=0,                       # Optional: end (0 = all)
     output_language="English"          # Optional
 )
 ```
@@ -206,8 +191,8 @@ transcripts = extract_transcripts_only(
 ### Course Materials
 ```python
 # Convert lectures to study materials
-study_files = process_youtube_playlist(
-    url="https://www.youtube.com/playlist?list=COURSE_PLAYLIST",
+study_files = process_youtube_video(
+    url="https://www.youtube.com/watch?v=LECTURE_VIDEO",
     output_dir="./course_materials",
     openai_api_key="your-key",
     styles=["Educational", "Summary"]
@@ -225,7 +210,7 @@ docs = api.process_with_ai(transcripts, "./docs", styles=["Educational"])
 ### Research and Analysis
 ```python
 # Process conference talks for research
-files = process_youtube_playlist(
+files = process_youtube_video(
     url="https://www.youtube.com/watch?v=CONFERENCE_TALK",
     output_dir="./research",
     openai_api_key="your-key",
