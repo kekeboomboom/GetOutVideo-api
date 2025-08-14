@@ -19,6 +19,7 @@ class TranscriptConfig:
     cookie_path: Optional[str] = None
     use_ai_fallback: bool = False
     cleanup_temp_files: bool = True
+    transcript_languages: Optional[List[str]] = None  # Language codes to request (e.g., ['zh', 'en'])
     
     def __post_init__(self):
         """Validate configuration values."""

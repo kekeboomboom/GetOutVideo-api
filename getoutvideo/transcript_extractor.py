@@ -217,13 +217,52 @@ class TranscriptExtractor:
                                    f"Attempting standard transcript extraction for video {current_index}/{total_videos} "
                                    f"(Original Index: {original_index}) - Title: {video_title[:50]}...")
                 
-                fetched_transcript = YouTubeTranscriptApi().fetch(video_id)
-                transcript_text = ' '.join([t.text for t in fetched_transcript])
-                transcript_source = "youtube_api"
+                # Try to get transcript with language preferences
+                fetched_transcript = None
+                languages_used = "auto-detected"
+                
+                if self.config.transcript_config.transcript_languages:
+                    # Try with specified languages first
+                    print(f"DEBUG: Trying with specified languages: {self.config.transcript_config.transcript_languages}")
+                    try:
+                        fetched_transcript = YouTubeTranscriptApi().fetch(video_id, self.config.transcript_config.transcript_languages)
+                        languages_used = str(self.config.transcript_config.transcript_languages)
+                        print(f"DEBUG: Found transcript in specified languages")
+                    except (TranscriptsDisabled, NoTranscriptFound, VideoUnplayable):
+                        print(f"DEBUG: Specified languages not available, trying auto-detection...")
+                        pass
+                
+                if not fetched_transcript:
+                    # Fallback: try to get any available transcript
+                    try:
+                        # Get list of available transcripts
+                        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                        available_languages = []
+                        for transcript in transcript_list:
+                            available_languages.append(transcript.language_code)
+                            # Try the first available transcript
+                            fetched_transcript = transcript.fetch()
+                            languages_used = transcript.language_code
+                            print(f"DEBUG: Using available language: {transcript.language_code}")
+                            print(f"DEBUG: Available languages were: {available_languages}")
+                            break
+                    except Exception as list_e:
+                        print(f"DEBUG: Could not list available transcripts: {str(list_e)}")
+                        # Final fallback: try default fetch (no language specified)
+                        fetched_transcript = YouTubeTranscriptApi().fetch(video_id)
+                        languages_used = "default"
+                
+                # Handle both dict and object formats for transcript entries
+                if isinstance(fetched_transcript[0], dict):
+                    transcript_text = ' '.join([t['text'] for t in fetched_transcript])
+                else:
+                    transcript_text = ' '.join([t.text for t in fetched_transcript])
+                transcript_source = f"youtube_api ({languages_used})"
                 
                 print(f"DEBUG: Successfully extracted transcript via YouTube API, length: {len(transcript_text)}")
                 safe_status_callback(status_callback,
-                                   f"Successfully extracted transcript via YouTube API for video {current_index}/{total_videos}.")
+                                   f"Successfully extracted transcript via YouTube API for video {current_index}/{total_videos} "
+                                   f"(Language: {languages_used}).")
                 
             except (TranscriptsDisabled, NoTranscriptFound, VideoUnplayable) as e:
                 print(f"DEBUG: Standard transcript failed with {type(e).__name__}: {str(e)}")

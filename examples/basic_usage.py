@@ -22,10 +22,19 @@ def basic_single_video_example():
     # Initialize the API with OpenAI API key from environment
     api = GetOutVideoAPI(openai_api_key=os.getenv("OPENAI_API_KEY"))
     
+    # Configure transcript extraction for Chinese language
+    # This video is in Chinese, so we need to specify language preferences
+    from getoutvideo import TranscriptConfig
+    api.config.transcript_config = TranscriptConfig(
+        transcript_languages=['zh', 'zh-CN', 'zh-TW', 'en'],  # Try Chinese variants first, then English
+        use_ai_fallback=True  # Use AI transcription if no transcript available
+    )
+    
     # Process a single video with default settings (all styles)
     output_files = api.process_youtube_url(
-        url="https://www.youtube.com/watch?v=7gp7GkPE-tI",
-        output_dir="./output"
+        url="https://www.youtube.com/watch?v=iUaN-PxB0fo&ab_channel=%E8%AF%BE%E4%BB%A3%E8%A1%A8%E7%AB%8B%E6%AD%A3",
+        output_dir="./output",
+        styles=["Summary"],
     )
     
     print(f"Generated {len(output_files)} files:")
