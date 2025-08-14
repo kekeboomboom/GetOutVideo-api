@@ -35,6 +35,7 @@ def basic_single_video_example():
         url="https://www.youtube.com/watch?v=iUaN-PxB0fo&ab_channel=%E8%AF%BE%E4%BB%A3%E8%A1%A8%E7%AB%8B%E6%AD%A3",
         output_dir="./output",
         styles=["Summary"],
+        output_language="Chinese"
     )
     
     print(f"Generated {len(output_files)} files:")
