@@ -25,12 +25,13 @@ class AIProcessor:
     using various processing styles and handling large transcripts through chunking.
     """
     
-    # OpenAI GPT-5 pricing per 1M tokens (as of current rates)
-    # These are approximate rates and should be updated based on current OpenAI pricing
+    # OpenAI API pricing per 1M tokens (as of 2025 rates)
+    # These rates should be updated regularly as OpenAI pricing changes frequently
     OPENAI_PRICING = {
-        "gpt-5": {"input": 1.25, "output": 10.00},           # per 1M tokens
+        "gpt-4.1": {"input": 2.00, "output": 8.00},         # per 1M tokens
+        "gpt-5": {"input": 1.25, "output": 10.00},           # per 1M tokens (placeholder)
         "gpt-4-turbo": {"input": 10.00, "output": 30.00},   # per 1M tokens
-        "gpt-4o": {"input": 5.00, "output": 15.00},         # per 1M tokens
+        "gpt-4o": {"input": 3.00, "output": 10.00},         # per 1M tokens
         "gpt-4o-mini": {"input": 0.15, "output": 0.60},     # per 1M tokens
     }
     

@@ -30,17 +30,57 @@ def basic_single_video_example():
         use_ai_fallback=True  # Use AI transcription if no transcript available
     )
     
-    # Process a single video with default settings (all styles)
-    output_files = api.process_youtube_url(
-        url="https://www.youtube.com/watch?v=iUaN-PxB0fo&ab_channel=%E8%AF%BE%E4%BB%A3%E8%A1%A8%E7%AB%8B%E6%AD%A3",
-        output_dir="./output",
+    # Use two-step processing to get detailed results including cost information
+    print("Extracting transcripts...")
+    transcripts = api.extract_transcripts("https://www.youtube.com/watch?v=ugqVaSOfR5g&ab_channel=ChrisWilliamson")
+    
+    if not transcripts:
+        print("No transcripts extracted.")
+        return
+    
+    print(f"Processing {len(transcripts)} transcripts with AI...")
+    # Configure processing settings
+    from getoutvideo import ProcessingConfig
+    processing_config = ProcessingConfig(
         styles=["Summary"],
         output_language="Chinese"
     )
     
-    print(f"Generated {len(output_files)} files:")
-    for file_path in output_files:
-        print(f"  - {file_path}")
+    # Process with AI and get detailed results
+    results = api.process_with_ai(transcripts, "./output", processing_config)
+    
+    print(f"Generated {len(results)} files:")
+    for result in results:
+        print(f"  - {result.output_file_path}")
+    
+    # Display cost information
+    print("\n=== AI API Usage Cost Information ===")
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_cost = 0.0
+    
+    for result in results:
+        print(f"\nStyle: {result.style_name}")
+        print(f"  Input tokens: {result.openai_input_tokens:,}")
+        print(f"  Output tokens: {result.openai_output_tokens:,}")
+        print(f"  Processing cost: ${result.openai_cost:.6f}")
+        
+        total_input_tokens += result.openai_input_tokens or 0
+        total_output_tokens += result.openai_output_tokens or 0
+        total_cost += result.openai_cost or 0.0
+    
+    # Include transcript extraction cost if available
+    transcript_cost = 0.0
+    for transcript in transcripts:
+        if transcript.openai_cost:
+            transcript_cost += transcript.openai_cost
+    
+    if transcript_cost > 0:
+        print(f"\nTranscript extraction cost: ${transcript_cost:.6f}")
+        total_cost += transcript_cost
+    
+    print(f"\nTotal tokens used: {total_input_tokens + total_output_tokens:,}")
+    print(f"Total cost: ${total_cost:.6f}")
 
 
 def convenience_function_example():
