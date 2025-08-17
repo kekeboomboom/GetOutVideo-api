@@ -31,14 +31,14 @@ def basic_single_video_example():
     )
     
     # Use two-step processing to get detailed results including cost information
-    print("Extracting transcripts...")
-    transcripts = api.extract_transcripts("https://www.youtube.com/watch?v=ugqVaSOfR5g&ab_channel=ChrisWilliamson")
+    print("Extracting transcript...")
+    transcript = api.extract_transcripts("https://www.youtube.com/watch?v=ugqVaSOfR5g&ab_channel=ChrisWilliamson")
     
-    if not transcripts:
-        print("No transcripts extracted.")
+    if not transcript:
+        print("No transcript extracted.")
         return
     
-    print(f"Processing {len(transcripts)} transcripts with AI...")
+    print(f"Processing transcript '{transcript.title}' with AI...")
     # Configure processing settings
     from getoutvideo import ProcessingConfig
     processing_config = ProcessingConfig(
@@ -47,7 +47,7 @@ def basic_single_video_example():
     )
     
     # Process with AI and get detailed results
-    results = api.process_with_ai(transcripts, "./output", processing_config)
+    results = api.process_with_ai(transcript, "./output", processing_config)
     
     print(f"Generated {len(results)} files:")
     for result in results:

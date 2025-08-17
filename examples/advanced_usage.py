@@ -29,26 +29,25 @@ def two_step_processing_example():
     
     api = GetOutVideoAPI(openai_api_key="your-openai-api-key-here")
     
-    # Step 1: Extract transcripts only
-    print("Step 1: Extracting transcripts...")
-    transcripts = api.extract_transcripts(
+    # Step 1: Extract transcript only
+    print("Step 1: Extracting transcript...")
+    transcript = api.extract_transcripts(
         url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     )
     
-    print(f"Extracted {len(transcripts)} transcripts:")
-    for i, transcript in enumerate(transcripts, 1):
-        print(f"  {i}. {transcript.title[:50]}... ({len(transcript.transcript_text)} chars)")
+    print(f"Extracted transcript:")
+    print(f"  Title: {transcript.title[:50]}... ({len(transcript.transcript_text)} chars)")
     
     # Step 2: Process with AI using different styles
     print("\nStep 2: Processing with AI...")
     
     # Process with educational style
     api.config.processing_config.styles = ["Educational"]
-    results_edu = api.process_with_ai(transcripts, "./output/educational")
+    results_edu = api.process_with_ai(transcript, "./output/educational")
     
-    # Process same transcripts with summary style
+    # Process same transcript with summary style
     api.config.processing_config.styles = ["Summary"]
-    results_sum = api.process_with_ai(transcripts, "./output/summary")
+    results_sum = api.process_with_ai(transcript, "./output/summary")
     
     print(f"Generated {len(results_edu)} educational files and {len(results_sum)} summary files")
 

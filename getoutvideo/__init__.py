@@ -20,7 +20,7 @@ Quick Usage:
     )
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 import os
 
 from .config import APIConfig, TranscriptConfig, ProcessingConfig, load_config_from_env
@@ -124,7 +124,7 @@ class GetOutVideoAPI:
     
     def extract_transcripts(self,
                           url: str,
-                          config: Optional[TranscriptConfig] = None) -> List[VideoTranscript]:
+                          config: Optional[TranscriptConfig] = None) -> VideoTranscript:
         """
         Extract transcripts from YouTube URL only.
         
@@ -137,7 +137,7 @@ class GetOutVideoAPI:
             config: Optional transcript configuration (uses API default if None)
             
         Returns:
-            List[VideoTranscript]: Extracted video transcripts
+            VideoTranscript: Extracted video transcript
             
         Raises:
             TranscriptExtractionError: If extraction fails
@@ -147,10 +147,11 @@ class GetOutVideoAPI:
             # Recreate extractor with updated config
             self.transcript_extractor = TranscriptExtractor(self.config)
         
-        return self.transcript_extractor.extract_transcripts(url)
+        transcripts = self.transcript_extractor.extract_transcripts(url)
+        return transcripts[0]  # Return single transcript for single video
     
     def process_with_ai(self,
-                       transcripts: List[VideoTranscript],
+                       transcripts: Union[VideoTranscript, List[VideoTranscript]],
                        output_dir: str,
                        config: Optional[ProcessingConfig] = None) -> List[ProcessingResult]:
         """
@@ -161,7 +162,7 @@ class GetOutVideoAPI:
         or parameters to the same transcripts.
         
         Args:
-            transcripts: List of video transcripts to process
+            transcripts: Video transcript or list of video transcripts to process
             output_dir: Directory where processed files will be saved
             config: Optional processing configuration (uses API default if None)
             
@@ -175,6 +176,10 @@ class GetOutVideoAPI:
             self.config.processing_config = config
             # Recreate processor with updated config
             self.ai_processor = AIProcessor(self.config)
+        
+        # Convert single transcript to list for processing
+        if isinstance(transcripts, VideoTranscript):
+            transcripts = [transcripts]
         
         return self.ai_processor.process_transcripts(transcripts, output_dir)
     
@@ -195,7 +200,7 @@ class GetOutVideoAPI:
 def extract_transcripts_only(url: str,
                            openai_api_key: str,
                            gemini_api_key: Optional[str] = None,
-                           use_ai_fallback: bool = True) -> List[VideoTranscript]:
+                           use_ai_fallback: bool = True) -> VideoTranscript:
     """
     Extract transcripts only without AI processing.
     
@@ -206,7 +211,7 @@ def extract_transcripts_only(url: str,
         use_ai_fallback: Whether to use AI STT when YouTube transcripts unavailable
         
     Returns:
-        List[VideoTranscript]: Extracted video transcripts
+        VideoTranscript: Extracted video transcript
         
     Raises:
         TranscriptExtractionError: If extraction fails
