@@ -168,3 +168,5 @@ output_transcripts/
 # API keys and secrets
 .env.local
 api_keys.txt
+
+.idea
